@@ -29,7 +29,13 @@ export interface HtmlRenderReference {
    * width. Absent when the preview browser was not installed yet.
    */
   readonly heights?: ReadonlyArray<readonly [width: number, height: number]>;
+  /** Set only by `nofun_artifact_render`: how the thread shows the page. */
+  readonly display?: HtmlRenderDisplay;
+  /** Set only by `nofun_artifact_render`: open the page in the side panel when it arrives. */
+  readonly autoOpen?: boolean;
 }
+
+export type HtmlRenderDisplay = "inline" | "card";
 
 /** Frame widths the server measures a page at, from phones to the wide chat setting. */
 export const HTML_RENDER_MEASURE_WIDTHS = [320, 375, 430, 520, 640, 728, 860, 1000, 1144] as const;
@@ -64,7 +70,10 @@ function readMeasuredHeights(value: unknown) {
 
 export function readHtmlRenderReference(value: unknown): HtmlRenderReference | undefined {
   if (typeof value !== "object" || value === null) return undefined;
-  const { attachmentId, title, height, heights } = value as Record<string, unknown>;
+  const { attachmentId, title, height, heights, display, autoOpen } = value as Record<
+    string,
+    unknown
+  >;
   if (
     typeof attachmentId !== "string" ||
     attachmentId.length === 0 ||
@@ -81,6 +90,8 @@ export function readHtmlRenderReference(value: unknown): HtmlRenderReference | u
     title: title.trim().slice(0, HTML_RENDER_MAX_TITLE_LENGTH) || "HTML",
     height: clampHtmlRenderHeight(height),
     ...(measured === undefined ? {} : { heights: measured }),
+    ...(display === "inline" || display === "card" ? { display } : {}),
+    ...(typeof autoOpen === "boolean" ? { autoOpen } : {}),
   };
 }
 
@@ -90,6 +101,8 @@ export function htmlRenderReferencesEqual(left: HtmlRenderReference, right: Html
     left.attachmentId === right.attachmentId &&
     left.title === right.title &&
     left.height === right.height &&
+    left.display === right.display &&
+    left.autoOpen === right.autoOpen &&
     (left.heights ?? []).length === (right.heights ?? []).length &&
     (left.heights ?? []).every(
       ([width, height], index) =>

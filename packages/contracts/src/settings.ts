@@ -45,6 +45,11 @@ export const TimestampFormat = Schema.Literals(["locale", "12-hour", "24-hour"])
 export type TimestampFormat = typeof TimestampFormat.Type;
 const DEFAULT_TIMESTAMP_FORMAT: TimestampFormat = "locale";
 
+/** How No Fun artifacts show in a thread; "agent" follows the tool call's own display/open inputs. */
+export const NofunArtifactMode = Schema.Literals(["agent", "inline", "card", "card-open"]);
+export type NofunArtifactMode = typeof NofunArtifactMode.Type;
+const DEFAULT_NOFUN_ARTIFACT_MODE: NofunArtifactMode = "agent";
+
 export const DiffLayout = Schema.Literals(["stacked", "split"]);
 export type DiffLayout = typeof DiffLayout.Type;
 const DEFAULT_DIFF_LAYOUT: DiffLayout = "stacked";
@@ -484,6 +489,9 @@ export const ClientSettingsSchema = Schema.Struct({
   ),
   timestampFormat: TimestampFormat.pipe(
     Schema.withDecodingDefault(Effect.succeed(DEFAULT_TIMESTAMP_FORMAT)),
+  ),
+  nofunArtifactMode: NofunArtifactMode.pipe(
+    Schema.withDecodingDefault(Effect.succeed(DEFAULT_NOFUN_ARTIFACT_MODE)),
   ),
   snapShotEnabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   snapShotIncludeAccessibility: Schema.Boolean.pipe(
@@ -1829,6 +1837,7 @@ export const ClientSettingsPatch = Schema.Struct({
   sidebarThreadSortOrder: Schema.optionalKey(SidebarThreadSortOrder),
   sidebarThreadPreviewCount: Schema.optionalKey(SidebarThreadPreviewCount),
   timestampFormat: Schema.optionalKey(TimestampFormat),
+  nofunArtifactMode: Schema.optionalKey(NofunArtifactMode),
   snapShotEnabled: Schema.optionalKey(Schema.Boolean),
   snapShotIncludeAccessibility: Schema.optionalKey(Schema.Boolean),
   snapShotShortcut: Schema.optionalKey(SnapShotShortcut),

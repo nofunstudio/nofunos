@@ -358,6 +358,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["timestamp clock locale system browser os 12 hour 24 hour"],
   },
   {
+    id: "nofun-artifacts",
+    title: "No Fun artifacts",
+    to: "/settings/general",
+    searchTerms: ["inline card side panel open artifact dashboard no fun"],
+  },
+  {
     id: "response-streaming",
     title: "Response streaming",
     to: "/settings/general",

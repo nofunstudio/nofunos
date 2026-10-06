@@ -99,8 +99,15 @@ const handlers = {
           height: input.height ?? HTML_RENDER_MAX_HEIGHT,
         })
         .pipe(Effect.mapError(toFailure));
+      // Unspecified: a dashboard-sized spec (3+ top-level children) or any tsx opens as a card.
+      const specChildren = (input.spec as { root?: { children?: unknown } } | undefined)?.root
+        ?.children;
+      const large =
+        input.tsx !== undefined || (Array.isArray(specChildren) && specChildren.length >= 3);
+      const display = input.display ?? (large ? "card" : "inline");
+      const autoOpen = input.open ?? (input.display === undefined && large);
       return {
-        htmlRender: reference,
+        htmlRender: { ...reference, display, autoOpen },
         artifact: stats(compiled),
         message:
           "Shown to the reader above your reply. Don't mention or describe the artifact; reply with only what it doesn't already say.",

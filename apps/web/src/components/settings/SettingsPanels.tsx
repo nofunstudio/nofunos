@@ -44,6 +44,7 @@ import {
   type ResponseStreamingMode,
   MIN_TERMINAL_FONT_SIZE,
   type QuitConfirmationMode,
+  NofunArtifactMode,
   SidebarProjectSortOrder,
 } from "@t3tools/contracts/settings";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
@@ -196,6 +197,14 @@ const TIMESTAMP_FORMAT_LABELS = {
   "12-hour": "12-hour",
   "24-hour": "24-hour",
 } as const;
+
+const NOFUN_ARTIFACT_MODE_LABELS: Record<NofunArtifactMode, string> = {
+  agent: "Agent decides",
+  inline: "Always inline",
+  card: "Always card",
+  "card-open": "Always card + open on side",
+};
+const isNofunArtifactMode = Schema.is(NofunArtifactMode);
 
 const CHAT_WIDTH_LABELS: Record<ChatWidth, string> = {
   comfortable: "Comfortable",
@@ -553,6 +562,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat
         ? ["Time format"]
         : []),
+      ...(settings.nofunArtifactMode !== DEFAULT_UNIFIED_SETTINGS.nofunArtifactMode
+        ? ["No Fun artifacts"]
+        : []),
       ...(settings.notificationMode !== DEFAULT_UNIFIED_SETTINGS.notificationMode
         ? ["Thread notifications"]
         : []),
@@ -712,6 +724,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.sidebarThreadPreviewCount,
       settings.showSkillsInSlashMenu,
       settings.timestampFormat,
+      settings.nofunArtifactMode,
       settings.notificationMode,
       settings.inAppNotificationsEnabled,
       settings.wordWrap,
@@ -788,6 +801,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme,
       chatWidth: DEFAULT_UNIFIED_SETTINGS.chatWidth,
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
+      nofunArtifactMode: DEFAULT_UNIFIED_SETTINGS.nofunArtifactMode,
       notificationMode: DEFAULT_UNIFIED_SETTINGS.notificationMode,
       inAppNotificationsEnabled: DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled,
       wordWrap: DEFAULT_UNIFIED_SETTINGS.wordWrap,
@@ -2522,6 +2536,39 @@ export function GeneralSettingsPanel() {
                 <SelectItem hideIndicator value="24-hour">
                   {TIMESTAMP_FORMAT_LABELS["24-hour"]}
                 </SelectItem>
+              </SelectPopup>
+            </Select>
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("nofun-artifacts")}
+          description="How No Fun artifacts show in a thread. Agent decides follows the agent's choice."
+          resetAction={
+            settings.nofunArtifactMode !== DEFAULT_UNIFIED_SETTINGS.nofunArtifactMode ? (
+              <SettingResetButton
+                label="No Fun artifacts"
+                onClick={() =>
+                  updateSettings({ nofunArtifactMode: DEFAULT_UNIFIED_SETTINGS.nofunArtifactMode })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.nofunArtifactMode}
+              onValueChange={(value) => {
+                if (isNofunArtifactMode(value)) updateSettings({ nofunArtifactMode: value });
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full sm:w-56" aria-label="No Fun artifacts">
+                <SelectValue>{NOFUN_ARTIFACT_MODE_LABELS[settings.nofunArtifactMode]}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                {(Object.keys(NOFUN_ARTIFACT_MODE_LABELS) as NofunArtifactMode[]).map((mode) => (
+                  <SelectItem hideIndicator key={mode} value={mode}>
+                    {NOFUN_ARTIFACT_MODE_LABELS[mode]}
+                  </SelectItem>
+                ))}
               </SelectPopup>
             </Select>
           }

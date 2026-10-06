@@ -142,7 +142,7 @@ export const NofunArtifactPreviewTool = Tool.make(NOFUN_ARTIFACT_PREVIEW_TOOL_NA
 // Publishes through HtmlRender.publish, the same store html_render uses, and returns the same
 // `htmlRender` reference, so every client shows it inline like any HTML render.
 export const NofunArtifactRenderTool = Tool.make(NOFUN_ARTIFACT_RENDER_TOOL_NAME, {
-  description: `Compile a No Fun artifact and show it inline in this thread, above your final text reply, exactly like html_render (call it before writing that reply; don't announce or restate the page). Preview with nofun_artifact_preview first. Same inputs as the preview.\n\n${NOFUN_ARTIFACT_GUIDE}`,
+  description: `Compile a No Fun artifact and show it in this thread, above your final text reply (call it before writing that reply; don't announce or restate the page). Preview with nofun_artifact_preview first. Same inputs as the preview, plus display and open: a small chart or single metric shows inline; a dashboard, multi-section page or interactive tool should pass display \"card\" with open true.\n\n${NOFUN_ARTIFACT_GUIDE}`,
   parameters: Schema.Struct({
     ...ArtifactInput,
     title: Schema.String.check(
@@ -154,6 +154,18 @@ export const NofunArtifactRenderTool = Tool.make(NOFUN_ARTIFACT_RENDER_TOOL_NAME
         description: `Frame height cap in CSS pixels, ${HTML_RENDER_MIN_HEIGHT}-${HTML_RENDER_MAX_HEIGHT}. Omit to fit the page; pass less than the preview's contentHeight to make it scroll.`,
       }),
     ),
+    display: Schema.optional(
+      Schema.Literals(["inline", "card"]).annotate({
+        description:
+          'How the thread shows it. "inline": the page itself above your reply (small chart, single metric). "card": a compact titled card the reader opens (dashboard, multi-section page, interactive tool). Omit to let the app choose: card for specs with 3+ top-level children or any tsx, else inline. The reader\'s own setting can override this.',
+      }),
+    ),
+    open: Schema.optional(
+      Schema.Boolean.annotate({
+        description:
+          "Open the page in the side panel when it first appears. Use true for a dashboard or interactive tool the reader will work in. Omit to follow the default for the display mode.",
+      }),
+    ),
   }),
   success: Schema.Struct({
     htmlRender: Schema.Struct({
@@ -161,6 +173,8 @@ export const NofunArtifactRenderTool = Tool.make(NOFUN_ARTIFACT_RENDER_TOOL_NAME
       title: Schema.String,
       height: Schema.Number,
       heights: Schema.optional(Schema.Array(Schema.Tuple([Schema.Int, Schema.Int]))),
+      display: Schema.optional(Schema.Literals(["inline", "card"])),
+      autoOpen: Schema.optional(Schema.Boolean),
     }),
     artifact: ArtifactStats,
     message: Schema.String,

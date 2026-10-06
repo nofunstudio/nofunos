@@ -172,7 +172,11 @@ export function htmlRenderFromToolItem(item: {
   const toolId = resolveT3McpToolId(item.toolName);
   if (toolId !== HTML_RENDER_TOOL_NAME && toolId !== "nofun_artifact_render") return undefined;
   const output = compactDynamicToolOutput(item.output);
-  return output?.isError ? undefined : output?.htmlRender;
+  const htmlRender = output?.isError ? undefined : output?.htmlRender;
+  if (htmlRender === undefined || toolId === "nofun_artifact_render") return htmlRender;
+  // T3's own html_render never carries No Fun display hints.
+  const { display: _display, autoOpen: _autoOpen, ...plain } = htmlRender;
+  return plain;
 }
 
 /** Some providers report completion even when command output describes a failure. */

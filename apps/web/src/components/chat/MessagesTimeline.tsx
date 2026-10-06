@@ -255,6 +255,8 @@ import { ContextChip, ContextChipLabel, type ContextChipKind } from "../ContextC
 import { createContextPresentationRegistry } from "../contextPresentationRegistry";
 import { useOpenPrLink } from "~/lib/openPullRequestLink";
 import { useClientSettings } from "~/hooks/useSettings";
+import { useNofunArtifactBehavior } from "../../nofun/artifactDisplay";
+import { NofunArtifactCard } from "../../nofun/NofunArtifactCard";
 import type { ChatMarkdownContextReference } from "../ChatMarkdown";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
 import { cn } from "~/lib/utils";
@@ -2706,17 +2708,28 @@ function ProposedPlanTimelineRow({
 
 function HtmlRenderTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "html-render" }> }) {
   const ctx = use(TimelineRowCtx);
+  const behavior = useNofunArtifactBehavior(row.htmlRender, row.createdAt, ctx.onFileOpen);
 
   return (
     <div className="min-w-0 px-1">
-      <HtmlRenderFrame
-        // A recycled row must not keep another page's frozen frame.
-        key={row.htmlRender.attachmentId}
-        environmentId={ctx.activeThreadEnvironmentId}
-        htmlRender={row.htmlRender}
-        onOpen={ctx.onFileOpen}
-        {...(ctx.threadRef ? { pinThreadId: ctx.threadRef.threadId } : {})}
-      />
+      {behavior.display === "card" ? (
+        <NofunArtifactCard
+          key={row.htmlRender.attachmentId}
+          environmentId={ctx.activeThreadEnvironmentId}
+          htmlRender={row.htmlRender}
+          onOpen={ctx.onFileOpen}
+          pinThreadId={ctx.threadRef?.threadId}
+        />
+      ) : (
+        <HtmlRenderFrame
+          // A recycled row must not keep another page's frozen frame.
+          key={row.htmlRender.attachmentId}
+          environmentId={ctx.activeThreadEnvironmentId}
+          htmlRender={row.htmlRender}
+          onOpen={ctx.onFileOpen}
+          {...(ctx.threadRef ? { pinThreadId: ctx.threadRef.threadId } : {})}
+        />
+      )}
     </div>
   );
 }
