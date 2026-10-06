@@ -34,6 +34,10 @@ import {
   selectCliRuntimeExternalDependencies,
 } from "./lib/cli-external-packages.ts";
 import { loadRepoEnv } from "./lib/public-config.ts";
+import {
+  NOFUN_ARTIFACTS_PACKAGE,
+  prebuildNofunArtifactsRuntime,
+} from "./lib/nofun-artifacts-runtime.ts";
 import { selectDesktopRuntimeExternalDependencies } from "./lib/desktop-external-packages.ts";
 import { resolveCatalogDependencies } from "./lib/resolve-catalog.ts";
 
@@ -940,6 +944,11 @@ interface StagePackageJson {
 }
 
 export const STAGE_INSTALL_ARGS = ["install", "--prod"] as const;
+// esbuild's Go binary reads the artifact compiler's sources and runs from real paths, never app.asar.
+export const NOFUN_ARTIFACTS_ASAR_UNPACK_GLOBS = [
+  "**/node_modules/@t3tools/nofun-artifacts/**/*",
+  "**/node_modules/@esbuild/**/*",
+] as const;
 export const DESKTOP_ELECTRON_LANGUAGES = ["en-US"] as const;
 export const DESKTOP_FILE_EXCLUSIONS = [
   // Cursor finds platform assets by walking up from argv[1]. Keep them outside
@@ -2688,7 +2697,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
     // not inflate the loose-file count and slow NSIS installation.
     ...(platform === "win"
       ? { asar: { smartUnpack: false }, asarUnpack: [WINDOWS_NATIVE_ASAR_UNPACK_GLOB] }
-      : {}),
+      : { asarUnpack: [...NOFUN_ARTIFACTS_ASAR_UNPACK_GLOBS] }),
     extraResources: [
       ...DESKTOP_EXTRA_RESOURCES,
       ...(platform === "linux" ? LINUX_CAPTURE_EXTRA_RESOURCES : []),
@@ -3682,6 +3691,15 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
           arch: options.arch,
           fffNodeVersion: serverPackageJson.dependencies["@ff-labs/fff-node"],
         });
+  // The server bundle leaves the No Fun artifact compiler external (it reads its own sources at
+  // runtime), and it is a workspace devDependency, so stage a prebuilt JS copy as a file: dependency.
+  if (options.platform !== "win") {
+    const nofunArtifactsDir = path.join(stageRoot, "nofun-artifacts");
+    yield* Effect.tryPromise(() =>
+      prebuildNofunArtifactsRuntime({ repoRoot, outDir: nofunArtifactsDir }),
+    );
+    stageDependencies[NOFUN_ARTIFACTS_PACKAGE] = "file:../nofun-artifacts";
+  }
   const stagePatchedDependencies = createStagePatchedDependencies(
     workspacePatchedDependencies,
     stageDependencies,
