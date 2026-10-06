@@ -32,6 +32,7 @@ import {
   type Judged,
   type Variant,
 } from "../../../nofun/pages/jev.ts";
+import { playbookFor } from "../../../nofun/playbook.ts";
 import { parseFlatSpec, type FlatSpec } from "../../../nofun/pages/spec.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import { readMutationCaller } from "../../threadAccess.ts";
@@ -96,7 +97,8 @@ const CHECKLIST = [
 
 const handlers = {
   nofun_page_catalog: (input) =>
-    Effect.sync(() => {
+    Effect.gen(function* () {
+      const caller = yield* McpInvocationContext.McpInvocationContext;
       const pool = poolFor(input.brand ?? "");
       const slots: Record<string, string[]> = {};
       for (const c of pool.kept) {
@@ -114,6 +116,7 @@ const handlers = {
           : "No authored profile for this brand: treated as calm with no photography, so loud blocks and photo heroes are filtered out.",
         slots,
         droppedForBrand: pool.rejected.map((r) => `${r.id}: ${r.why}`),
+        ...playbookFor(caller),
       };
     }),
 
@@ -212,6 +215,7 @@ const handlers = {
         message: reference
           ? "Shown to the reader above your reply. Don't describe the page; look at the two screenshots against the checklist and recompose with publish false if something is wrong."
           : "Draft only (not shown to the reader). Fix what the checklist names and call again; publish true (the default) for the final page.",
+        ...playbookFor({ thread }),
       };
     }),
 
@@ -341,6 +345,7 @@ const handlers = {
         summary: table,
         message:
           "The survivors are shown as closed cards above your reply. The judge saw block order and tags only. Screenshot your pick with nofun_page_compose (sections from its blocks, publish false) before recommending it.",
+        ...playbookFor({ thread }),
       };
     }),
 } satisfies Parameters<typeof NofunPageToolkit.toLayer>[0];

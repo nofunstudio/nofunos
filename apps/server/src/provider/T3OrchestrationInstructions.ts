@@ -10,8 +10,10 @@ const NOFUN_VISUALS = `### Visual output (No Fun)
 
 Whenever the user asks for an artifact, visual, page, dashboard, chart or mockup, use the No Fun artifact tools. Never use plain \`html_render\` or hand-written HTML for these, and the user will not remind you. Text stays primary: only use a visual when it says more than prose, with real data.
 
-- Find parts first with \`nofun_components_search\` when it is available.
-- Landing pages and full pages: prefer \`nofun_page_compose\` / \`nofun_page_variants\` when available.
+- The first \`nofun_*\` call in a thread returns the No Fun artifact playbook; follow it. Re-read it, or open a reference, with \`nofun_design_guide\`.
+- Find parts first with \`nofun_components_search\`.
+- Landing pages and full pages: \`nofun_page_compose\` (or \`nofun_page_variants\`).
+- Quick first iterations: write 3+ real section components and call \`nofun_artifact_prototype\` for several layouts (Jev orders them), pick one, then refine it below.
 - Otherwise build with \`nofun_artifact_preview\` (self-check), then \`nofun_artifact_render\`: a catalog \`spec\` when the ten components fit, or custom \`tsx\` importing real blocks (\`@nofun/ui/<name>\`, \`@nofun/kobra/<name>\`) plus \`react\`, \`@nofun/artifacts\`, \`@tabler/icons-react\`, \`motion\`, \`recharts\`. Theme: \`kobra\` by default, any No Fun brand id, or \`t3\` to follow the app.
 - Big pages, dashboards, multi-section pages and interactive tools: \`display: "card"\` with \`open: true\`. A small chart or single metric: \`display: "inline"\`.
 - The reader sees the result above your reply; don't announce or restate it.`;

@@ -327,6 +327,17 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
     ["Search", "Searching", "Searched", "No Fun components"],
     "thread-search",
   ),
+  nofun_design_guide: tool(["Read", "Reading", "Read", "the No Fun design guide"], "thread-search"),
+  nofun_artifact_prototype: tool(
+    ["Prototype", "Prototyping", "Prototyped", "No Fun page layouts"],
+    "html-render",
+  ),
+  nofun_page_catalog: tool(["List", "Listing", "Listed", "No Fun page blocks"], "thread-search"),
+  nofun_page_compose: tool(["Compose", "Composing", "Composed", "a No Fun page"], "html-render"),
+  nofun_page_variants: tool(
+    ["Compose", "Composing", "Composed", "No Fun page variants"],
+    "html-render",
+  ),
 };
 
 /**

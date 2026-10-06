@@ -56,6 +56,7 @@ export const NofunPageCatalogTool = Tool.make(NOFUN_PAGE_CATALOG_TOOL_NAME, {
     brandNote: Schema.String,
     slots: Schema.Record(Schema.String, Schema.Array(Schema.String)),
     droppedForBrand: Schema.Array(Schema.String),
+    playbook: Schema.optional(Schema.String),
   }),
   failure: OrchestratorMcpFailure,
   dependencies: [McpInvocationContext.McpInvocationContext],
@@ -145,6 +146,7 @@ export const NofunPageComposeTool = Tool.make(NOFUN_PAGE_COMPOSE_TOOL_NAME, {
       }),
     ),
     message: Schema.String,
+    playbook: Schema.optional(Schema.String),
   }),
   failure: OrchestratorMcpFailure,
   dependencies: [
@@ -195,6 +197,7 @@ export const NofunPageVariantsTool = Tool.make(NOFUN_PAGE_VARIANTS_TOOL_NAME, {
     ),
     summary: Schema.String,
     message: Schema.String,
+    playbook: Schema.optional(Schema.String),
   }),
   failure: OrchestratorMcpFailure,
   failureMode: "return",

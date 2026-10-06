@@ -124,6 +124,7 @@ export const NofunArtifactPreviewTool = Tool.make(NOFUN_ARTIFACT_PREVIEW_TOOL_NA
     ),
     missingImages: Schema.optional(Schema.Array(Schema.String)),
     artifact: ArtifactStats,
+    playbook: Schema.optional(Schema.String),
     screenshot: Schema.Struct({
       mimeType: Schema.Literal("image/png"),
       data: Schema.String,
@@ -179,6 +180,7 @@ export const NofunArtifactRenderTool = Tool.make(NOFUN_ARTIFACT_RENDER_TOOL_NAME
     }),
     artifact: ArtifactStats,
     message: Schema.String,
+    playbook: Schema.optional(Schema.String),
   }),
   failure: OrchestratorMcpFailure,
   failureMode: "return",
@@ -224,8 +226,10 @@ export const NofunComponentsSearchTool = Tool.make(NOFUN_COMPONENTS_SEARCH_TOOL_
         brand: Schema.optional(Schema.String),
       }),
     ),
+    playbook: Schema.optional(Schema.String),
   }),
   failure: OrchestratorMcpFailure,
+  dependencies: [McpInvocationContext.McpInvocationContext],
 })
   .annotate(Tool.Title, "Search No Fun components")
   .annotate(Tool.Readonly, true)

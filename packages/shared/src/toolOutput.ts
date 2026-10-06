@@ -164,16 +164,25 @@ export function compactDynamicToolOutput(value: unknown): CompactToolOutput | un
   return Object.keys(output).length === 0 ? undefined : output;
 }
 
+/** No Fun tools whose result carries a top-level `htmlRender` with display hints. */
+const NOFUN_HTML_RENDER_TOOLS: ReadonlySet<string> = new Set([
+  "nofun_artifact_render",
+  "nofun_artifact_prototype",
+  "nofun_page_compose",
+  "nofun_page_variants",
+]);
+
 /** The page a completed `html_render` tool call published, if this item is one. */
 export function htmlRenderFromToolItem(item: {
   readonly toolName: string | null | undefined;
   readonly output?: unknown;
 }): HtmlRenderReference | undefined {
   const toolId = resolveT3McpToolId(item.toolName);
-  if (toolId !== HTML_RENDER_TOOL_NAME && toolId !== "nofun_artifact_render") return undefined;
+  if (toolId !== HTML_RENDER_TOOL_NAME && !NOFUN_HTML_RENDER_TOOLS.has(toolId ?? ""))
+    return undefined;
   const output = compactDynamicToolOutput(item.output);
   const htmlRender = output?.isError ? undefined : output?.htmlRender;
-  if (htmlRender === undefined || toolId === "nofun_artifact_render") return htmlRender;
+  if (htmlRender === undefined || NOFUN_HTML_RENDER_TOOLS.has(toolId ?? "")) return htmlRender;
   // T3's own html_render never carries No Fun display hints.
   const { display: _display, autoOpen: _autoOpen, ...plain } = htmlRender;
   return plain;

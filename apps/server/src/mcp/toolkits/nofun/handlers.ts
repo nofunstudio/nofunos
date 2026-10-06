@@ -17,9 +17,11 @@ import * as Stream from "effect/Stream";
 import { AiError, McpServer } from "effect/ai";
 
 import * as HtmlRender from "../../../htmlRender/HtmlRender.ts";
+import * as GuideHandlers from "./guideHandlers.ts";
 import * as PageHandlers from "./pageHandlers.ts";
 import type * as McpHttpServer from "../../McpHttpServer.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
+import { playbookFor } from "../../../nofun/playbook.ts";
 import { readMutationCaller } from "../../threadAccess.ts";
 import {
   NofunArtifactPreviewTool,
@@ -71,12 +73,14 @@ const handlers = {
       );
       const compiled = yield* compile(input);
       const htmlRender = yield* HtmlRender.HtmlRender;
+      const caller = yield* McpInvocationContext.McpInvocationContext;
       const { png, ...preview } = yield* htmlRender
         .preview({ html: compiled.html, width: input.width, appearance: input.appearance })
         .pipe(Effect.mapError(toFailure));
       return {
         ...preview,
         artifact: stats(compiled),
+        ...playbookFor(caller),
         screenshot: {
           mimeType: "image/png" as const,
           data: png,
@@ -115,6 +119,7 @@ const handlers = {
         artifact: stats(compiled),
         message:
           "Shown to the reader above your reply. Don't mention or describe the artifact; reply with only what it doesn't already say.",
+        ...playbookFor({ thread }),
       };
     }),
 } satisfies Parameters<typeof NofunArtifactToolkit.toLayer>[0];
@@ -122,16 +127,20 @@ const handlers = {
 const layerSearchHandlers = NofunComponentsSearchToolkit.toLayer({
   // Reads the live nofun-components index (registry.json + ontology); never the whole index.
   nofun_components_search: (input) =>
-    Effect.tryPromise({
-      try: async () => ({
-        source: await sourceStamp(),
-        matches: await searchComponents(input),
-      }),
-      catch: (error) =>
-        new OrchestratorMcpFailure({
-          code: "orchestration_error",
-          message: `No Fun component search failed: ${error instanceof Error ? error.message : String(error)}`,
+    Effect.gen(function* () {
+      const caller = yield* McpInvocationContext.McpInvocationContext;
+      const found = yield* Effect.tryPromise({
+        try: async () => ({
+          source: await sourceStamp(),
+          matches: await searchComponents(input),
         }),
+        catch: (error) =>
+          new OrchestratorMcpFailure({
+            code: "orchestration_error",
+            message: `No Fun component search failed: ${error instanceof Error ? error.message : String(error)}`,
+          }),
+      });
+      return { ...found, ...playbookFor(caller) };
     }).pipe(Effect.withSpan("NofunComponents.search")),
 });
 
@@ -172,5 +181,6 @@ export const makeLayer = (registerImageTool: typeof McpHttpServer.registerImageT
     McpServer.toolkit(NofunComponentsSearchToolkit).pipe(Layer.provide(layerSearchHandlers)),
     Layer.effectDiscard(registerPreview()).pipe(Layer.provide(layerPreviewHandlers)),
     PageHandlers.makeLayer(),
+    GuideHandlers.makeLayer(),
   ).pipe(Layer.provide(HtmlRender.layer));
 };
