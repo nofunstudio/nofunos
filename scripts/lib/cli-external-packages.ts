@@ -48,6 +48,13 @@ export const CLI_RUNTIME_EXTERNAL_PREFIXES = [
   // becoming real if either is ever declared as a dependency.
   "bufferutil",
   "utf-8-validate",
+  // No Fun artifact compiler reads its own sources and esbuild/Tailwind binaries from disk.
+  "@t3tools/nofun-artifacts",
+  "esbuild",
+  "@esbuild/",
+  "tailwindcss",
+  "@tailwindcss/",
+  "lightningcss",
 ] as const;
 
 // These are Cursor's disk-backed dependency closure. Match package boundaries
