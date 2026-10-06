@@ -3007,6 +3007,14 @@ export const OrchestrationV2Command = Schema.Union([
     modelSelection: ModelSelection,
     runtimeMode: RuntimeMode,
     interactionMode: ProviderInteractionMode,
+    // The MCP service resolves and creates the worktree before dispatch; an
+    // absent binding is the legacy inherited-workspace behavior.
+    workspaceBinding: Schema.optional(
+      Schema.Struct({
+        branch: TrimmedNonEmptyString,
+        worktreePath: TrimmedNonEmptyString,
+      }),
+    ),
     // Omitted behaves as "settled_only" (no wake while the parent has a live
     // run); producers that want fire-and-forget wakes must set "always".
     completionWake: Schema.optional(Schema.Literals(["always", "settled_only"])),

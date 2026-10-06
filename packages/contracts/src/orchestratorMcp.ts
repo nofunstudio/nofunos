@@ -173,6 +173,19 @@ export const OrchestratorMcpDelegateTaskInput = Schema.Struct({
   }),
   target: Schema.optional(OrchestratorMcpTarget),
   title: Schema.optional(OrchestratorMcpTitle),
+  workspace: Schema.optional(
+    Schema.Struct({
+      strategy: Schema.Literals(["inherit", "worktree"]).annotate({
+        description:
+          "Inherit this thread's workspace (default), or prepare an isolated worktree before the child starts.",
+      }),
+      branch: Schema.optional(
+        TrimmedNonEmptyString.annotate({
+          description: "Branch name for a new worktree. Omit it to let T3 choose a stable name.",
+        }),
+      ),
+    }),
+  ),
   role: Schema.optional(OrchestratorMcpTaskRole),
   mode: Schema.optional(
     Schema.Literals(["async", "wait"]).annotate({
@@ -501,6 +514,8 @@ export const OrchestratorMcpCapabilitiesResult = Schema.Struct({
     threadManagement: Schema.Boolean,
     incrementalThreadRead: Schema.Boolean,
     scheduledTasks: Schema.Boolean,
+    /** Optional so clients can still decode capability responses from older servers. */
+    delegatedTaskWorktrees: Schema.optional(Schema.Boolean),
     maxBatchThreads: Schema.Number,
   }),
 });
