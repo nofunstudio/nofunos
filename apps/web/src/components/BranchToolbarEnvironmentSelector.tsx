@@ -12,6 +12,7 @@ import {
   THREAD_DETAILS_PANEL_LOCKED_ROW_CLASS,
 } from "./chat/threadDetailsPanelStyles";
 import { EnvironmentMachineIcon } from "./EnvironmentMachineIcon";
+import { EnvironmentPersonaAvatar } from "~/nofun/persona";
 import { useComposerMenuProps } from "./chat/composerEventScope";
 import {
   Select,
@@ -73,10 +74,7 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
         )}
         data-composer-context-control
       >
-        <EnvironmentMachineIcon
-          kind={activeEnvironment?.machine ?? "server"}
-          className={displayMode === "panel" ? THREAD_DETAILS_PANEL_ICON_CLASS : "size-3 shrink-0"}
-        />
+        <EnvironmentPersonaAvatar environmentId={environmentId} className="size-3.5" />
         <ComposerContextLabel displayMode={displayMode}>
           {activeEnvironment?.label ?? "Run on"}
         </ComposerContextLabel>
@@ -119,12 +117,7 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
               aria-hidden="true"
             />
           ) : (
-            <EnvironmentMachineIcon
-              kind={activeEnvironment?.machine ?? "server"}
-              className={
-                displayMode === "panel" ? THREAD_DETAILS_PANEL_ICON_CLASS : "size-3 shrink-0"
-              }
-            />
+            <EnvironmentPersonaAvatar environmentId={environmentId} className="size-3.5" />
           )}
           <ComposerContextLabel displayMode={displayMode}>
             <SelectValue />
@@ -159,6 +152,7 @@ export const BranchToolbarEnvironmentSelector = memo(function BranchToolbarEnvir
           {availableEnvironments.map((env) => (
             <SelectItem key={env.environmentId} value={env.environmentId}>
               <span className="inline-flex items-center gap-1.5">
+                <EnvironmentPersonaAvatar environmentId={env.environmentId} className="size-3.5" />
                 <EnvironmentMachineIcon kind={env.machine} className="size-3" />
                 {env.label}
               </span>

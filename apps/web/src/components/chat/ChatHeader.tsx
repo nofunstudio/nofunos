@@ -31,6 +31,7 @@ import {
   WorkspaceBreadcrumbText,
 } from "../WorkspaceBreadcrumb";
 import { cn } from "~/lib/utils";
+import { PersonaAvatar, usePersonaIdentity } from "~/nofun/persona";
 
 interface ChatHeaderProps {
   activeThreadEnvironmentId: EnvironmentId;
@@ -75,6 +76,7 @@ export const ChatHeader = memo(function ChatHeader({
   onNewThreadInProject,
   onOpenProjectSettings,
 }: ChatHeaderProps) {
+  const persona = usePersonaIdentity(activeThreadEnvironmentId);
   const activeProjectName = activeProject?.title;
   const activeProjectCwd = activeProject?.workspaceRoot ?? null;
   const activeThreadRef = useMemo(
@@ -240,6 +242,24 @@ export const ChatHeader = memo(function ChatHeader({
         ariaLabel="Thread breadcrumb"
         className="flex-1 overflow-clip [overflow-clip-margin:2px]"
       >
+        {/* No Fun: the persona leads, so which world a thread runs in is never a guess. */}
+        <WorkspaceBreadcrumbItem className="shrink-0">
+          <span
+            data-nofun-persona-header={persona.id}
+            className={cn(
+              "inline-flex h-6 items-center gap-1.5 rounded-full border ps-0.5 pe-2 text-xs font-semibold tracking-tight",
+              persona.isAlternate
+                ? "border-foreground/20 bg-popover text-foreground shadow-xs"
+                : "border-border bg-accent/40 text-foreground",
+            )}
+          >
+            <PersonaAvatar persona={persona} className="size-5" />
+            {persona.label}
+          </span>
+        </WorkspaceBreadcrumbItem>
+        <WorkspaceBreadcrumbSeparator>
+          <WorkspaceBreadcrumbText>/</WorkspaceBreadcrumbText>
+        </WorkspaceBreadcrumbSeparator>
         {/* The project always leads the header: knowing which project a
             thread lives in is priority zero, and the thread title alone
             doesn't answer it. */}

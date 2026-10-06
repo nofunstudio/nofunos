@@ -24,6 +24,8 @@ interface InstanceSpec {
 interface PersonaSpec {
   label: string;
   accent?: string;
+  /** Persona icon id shown by clients ("nofun" | "catches"); defaults to the persona id. */
+  icon?: string;
   port?: number;
   homeDir: string;
   allowedProjectRoots?: string[];
@@ -113,6 +115,7 @@ function start(personaId: string, args: string[]): void {
   env.T3CODE_PERSONA = personaId;
   env.T3CODE_PERSONA_LABEL = spec.label;
   if (spec.accent) env.T3CODE_PERSONA_ACCENT = spec.accent;
+  if (spec.icon) env.T3CODE_PERSONA_ICON = spec.icon;
   env.T3CODE_PERSONA_ROOTS = roots.join(path.delimiter);
 
   const command = [

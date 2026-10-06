@@ -265,6 +265,7 @@ import {
 } from "./ui/combobox";
 import { SidebarContent, SidebarGroup, useSidebar } from "./ui/sidebar";
 import { usePersonaEnvironmentLabeler } from "~/nofun/PersonaChip";
+import { EnvironmentPersonaAvatar } from "~/nofun/persona";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuShortcut, MenuTrigger } from "./ui/menu";
@@ -455,9 +456,10 @@ function SidebarThreadTooltip({
         ) : null}
         {environmentLabel ? (
           <div className="flex min-w-0 items-center gap-2">
+            <EnvironmentPersonaAvatar environmentId={thread.environmentId} className="size-3" />
             <EnvironmentMachineIcon
               kind={environmentMachine}
-              className="size-3 shrink-0 stroke-muted-foreground"
+              className="-ms-1 size-3 shrink-0 stroke-muted-foreground"
             />
             <div className="min-w-0 truncate text-foreground/75">{environmentLabel}</div>
           </div>

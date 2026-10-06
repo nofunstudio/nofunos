@@ -1,3 +1,4 @@
+import { NofunTimelineEmptyMark } from "~/nofun/PersonaWelcome";
 import { ComputerUseAppIcon } from "~/components/Icons";
 import { useChatCanvas } from "./ChatCanvasContext";
 import { WorkLogBlock, WorkLogButton, WorkLogDetails, WorkLogList, WorkLogRow } from "./WorkLog";
@@ -1319,8 +1320,9 @@ export const MessagesTimeline = memo(function MessagesTimeline({
       return <div className="h-full min-h-0 bg-background" data-timeline-loading="true" />;
     }
     return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-sm text-muted-foreground/30">
+      <div className="flex h-full flex-col items-center justify-center">
+        <NofunTimelineEmptyMark environmentId={activeThreadEnvironmentId} />
+        <p className="text-sm text-muted-foreground/50">
           Send a message to start the conversation.
         </p>
       </div>

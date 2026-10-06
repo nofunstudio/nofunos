@@ -259,6 +259,8 @@ import { previewRuntimeTabId } from "../browser/previewRuntimeTabId";
 import { addBrowserSurface } from "./preview/addBrowserSurface";
 import { NofunWidePanelToggle, useNofunWidePanel } from "~/nofun/artifactPanel";
 import { nofunProfileHomeUrl } from "~/nofun/PersonaChip";
+import { NofunPersonaBannerTitle, NofunStarters } from "~/nofun/PersonaWelcome";
+import { PersonaAvatar, usePersonaIdentity } from "~/nofun/persona";
 import { closePreviewSession } from "./preview/closePreviewSession";
 import { ThreadPreviewMiniPlayer } from "./preview/ThreadPreviewMiniPlayer";
 import { usePreviewSession } from "./preview/usePreviewSession";
@@ -7596,7 +7598,23 @@ export default function ChatView(props: ChatViewProps) {
           },
         })
       : null;
+  const nofunPersona = usePersonaIdentity(environmentId);
+  // No Fun: sending into the other persona's world is called out on the composer itself.
+  const personaBannerItem = useMemo<ComposerBannerStackItem | null>(
+    () =>
+      nofunPersona.isAlternate
+        ? {
+            id: `nofun-persona:${nofunPersona.id}`,
+            variant: "info",
+            compact: true,
+            icon: <PersonaAvatar persona={nofunPersona} className="size-4" />,
+            title: <NofunPersonaBannerTitle persona={nofunPersona} />,
+          }
+        : null,
+    [nofunPersona],
+  );
   const composerBannerItems = useMemo<ComposerBannerStackItem[]>(() => {
+    const personaItems = personaBannerItem === null ? [] : [personaBannerItem];
     const limitRecoveryItems = limitRecoveryBanner === null ? [] : [limitRecoveryBanner];
     const backgroundWorkItems = [goalBannerItem, backgroundWorkBannerItem].filter(
       (item) => item !== null,
@@ -7619,6 +7637,7 @@ export default function ChatView(props: ChatViewProps) {
         ...resumeCompactionItems,
         ...wokeThreadItems,
         ...parkedThreadItems,
+        ...personaItems,
       ];
     }
     return [
@@ -7669,8 +7688,10 @@ export default function ChatView(props: ChatViewProps) {
         },
       },
       ...parkedThreadItems,
+      ...personaItems,
     ];
   }, [
+    personaBannerItem,
     activeBranchMismatchKey,
     activeThreadShell,
     serverRuntime?.usageLimitResetAt,
@@ -11229,6 +11250,14 @@ export default function ChatView(props: ChatViewProps) {
                           activeProjectTitle={activeProject?.title ?? null}
                         />
                       </div>
+                    </div>
+                  ) : null}
+                  {isDraftHeroState ? (
+                    // No Fun starters hang below the centered composer, like the headline above it.
+                    <div className="absolute inset-x-0 top-full pt-5">
+                      <NofunStarters
+                        onPick={(text) => composerRef.current?.insertTextAtEnd(text)}
+                      />
                     </div>
                   ) : null}
                   <div

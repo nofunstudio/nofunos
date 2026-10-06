@@ -40,13 +40,14 @@ export function readNofunPersonaScope(
   if (!id) return undefined;
   const label = env.T3CODE_PERSONA_LABEL?.trim() || id;
   const accent = env.T3CODE_PERSONA_ACCENT?.trim();
+  const icon = env.T3CODE_PERSONA_ICON?.trim() || id;
   const allowedRoots = (env.T3CODE_PERSONA_ROOTS ?? "")
     .split(PATH_DELIMITER)
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0)
     .map((entry) => expand(entry));
   return {
-    info: { id, label, ...(accent ? { accent } : {}) },
+    info: { id, label, icon, ...(accent ? { accent } : {}) },
     allowedRoots,
   };
 }

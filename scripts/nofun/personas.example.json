@@ -4,6 +4,7 @@
     "nofun": {
       "label": "No Fun",
       "accent": "#e8e6df",
+      "icon": "nofun",
       "port": 3790,
       "homeDir": "~/.nofun-t3/nofun",
       "allowedProjectRoots": ["~/Documents/GitHub"],
@@ -24,6 +25,7 @@
     "catches": {
       "label": "CATCHES",
       "accent": "#ff5a36",
+      "icon": "catches",
       "port": 3791,
       "homeDir": "~/.nofun-t3/catches",
       "allowedProjectRoots": ["~/Documents/GitHub/catches"],
