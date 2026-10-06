@@ -94,7 +94,11 @@ export function Metric({
           value={value}
           format={format}
           currency={currency}
-          maximumFractionDigits={maximumFractionDigits}
+          // A whole-number amount reads "$48,210", not "$48,210.00".
+          maximumFractionDigits={
+            maximumFractionDigits ??
+            (format === "currency" && value !== null && Number.isInteger(value) ? 0 : undefined)
+          }
           suffix={unit}
         />
         <KpiTrend value={change ?? null} invert={invert ?? false} size="sm" />

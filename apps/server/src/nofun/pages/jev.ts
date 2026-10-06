@@ -89,29 +89,39 @@ async function writeLedger(stateDir: string, row: LedgerRow) {
   }
 }
 
-/** Evaluator that logs every gateway request to the ledger and stops past a request budget. */
+/**
+ * Evaluator that logs every gateway request to the ledger and stops past a request budget. `forPurpose` returns an
+ * evaluator that logs its own label, so concurrent compositions do not overwrite each other's ledger rows.
+ */
 export async function makeEvaluator(stateDir: string, purpose: { value: string }, budget: number) {
   const apiKey = await readGatewayKey(stateDir);
   const base = createEvaluator({ model: JEV_MODEL, apiKey, timeoutMs: 60_000 });
   let used = 0;
-  const evaluate: Experimental_CompositionEvaluator = async (req) => {
-    if (used >= budget) throw new Error(`Jev request budget of ${budget} reached`);
-    used++;
-    let inputTokens: number | null = null;
-    try {
-      const res = await base(req);
-      inputTokens = res.usage?.inputTokens ?? null;
-      return res;
-    } finally {
-      await writeLedger(stateDir, {
-        time: new Date().toISOString(),
-        requests: 1,
-        inputTokens,
-        purpose: purpose.value,
-      });
-    }
+  const forPurpose =
+    (label: () => string): Experimental_CompositionEvaluator =>
+    async (req) => {
+      if (used >= budget) throw new Error(`Jev request budget of ${budget} reached`);
+      used++;
+      const purposeLabel = label();
+      let inputTokens: number | null = null;
+      try {
+        const res = await base(req);
+        inputTokens = res.usage?.inputTokens ?? null;
+        return res;
+      } finally {
+        await writeLedger(stateDir, {
+          time: new Date().toISOString(),
+          requests: 1,
+          inputTokens,
+          purpose: purposeLabel,
+        });
+      }
+    };
+  return {
+    evaluate: forPurpose(() => purpose.value),
+    forPurpose: (label: string) => forPurpose(() => label),
+    requestsUsed: () => used,
   };
-  return { evaluate, requestsUsed: () => used };
 }
 
 /**
