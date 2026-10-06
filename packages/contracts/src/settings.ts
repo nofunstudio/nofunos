@@ -297,6 +297,10 @@ export const DiffColorScheme = Schema.Literals(["red-green", "blue-orange"]);
 export const ChatWidth = Schema.Literals(["comfortable", "wide", "full"]);
 export type ChatWidth = typeof ChatWidth.Type;
 
+/** Which terminal the thread drawer renders. Warp is an experimental embedded guest; Ghostty stays the default. */
+export const TerminalRenderer = Schema.Literals(["ghostty", "warp"]);
+export type TerminalRenderer = typeof TerminalRenderer.Type;
+
 export const ClientSettingsSchema = Schema.Struct({
   notificationMode: NotificationMode.pipe(
     Schema.withDecodingDefault(Effect.succeed("off" as const)),
@@ -507,6 +511,9 @@ export const ClientSettingsSchema = Schema.Struct({
   snapShotFlash: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   snapShotAnimations: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
   wordWrap: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
+  terminalRenderer: TerminalRenderer.pipe(
+    Schema.withDecodingDefault(Effect.succeed("ghostty" as const)),
+  ),
 });
 export type ClientSettings = typeof ClientSettingsSchema.Type;
 
@@ -1846,5 +1853,6 @@ export const ClientSettingsPatch = Schema.Struct({
   snapShotFlash: Schema.optionalKey(Schema.Boolean),
   snapShotAnimations: Schema.optionalKey(Schema.Boolean),
   wordWrap: Schema.optionalKey(Schema.Boolean),
+  terminalRenderer: Schema.optionalKey(TerminalRenderer),
 });
 export type ClientSettingsPatch = typeof ClientSettingsPatch.Type;

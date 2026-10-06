@@ -198,6 +198,11 @@ const TIMESTAMP_FORMAT_LABELS = {
   "24-hour": "24-hour",
 } as const;
 
+const TERMINAL_RENDERER_LABELS = {
+  ghostty: "Ghostty (default)",
+  warp: "Warp (experimental)",
+} as const;
+
 const NOFUN_ARTIFACT_MODE_LABELS: Record<NofunArtifactMode, string> = {
   agent: "Agent decides",
   inline: "Always inline",
@@ -562,6 +567,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       ...(settings.timestampFormat !== DEFAULT_UNIFIED_SETTINGS.timestampFormat
         ? ["Time format"]
         : []),
+      ...(settings.terminalRenderer !== DEFAULT_UNIFIED_SETTINGS.terminalRenderer
+        ? ["Terminal renderer"]
+        : []),
       ...(settings.nofunArtifactMode !== DEFAULT_UNIFIED_SETTINGS.nofunArtifactMode
         ? ["No Fun artifacts"]
         : []),
@@ -724,6 +732,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.sidebarThreadPreviewCount,
       settings.showSkillsInSlashMenu,
       settings.timestampFormat,
+      settings.terminalRenderer,
       settings.nofunArtifactMode,
       settings.notificationMode,
       settings.inAppNotificationsEnabled,
@@ -801,6 +810,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       diffColorScheme: DEFAULT_UNIFIED_SETTINGS.diffColorScheme,
       chatWidth: DEFAULT_UNIFIED_SETTINGS.chatWidth,
       timestampFormat: DEFAULT_UNIFIED_SETTINGS.timestampFormat,
+      terminalRenderer: DEFAULT_UNIFIED_SETTINGS.terminalRenderer,
       nofunArtifactMode: DEFAULT_UNIFIED_SETTINGS.nofunArtifactMode,
       notificationMode: DEFAULT_UNIFIED_SETTINGS.notificationMode,
       inAppNotificationsEnabled: DEFAULT_UNIFIED_SETTINGS.inAppNotificationsEnabled,
@@ -2535,6 +2545,42 @@ export function GeneralSettingsPanel() {
                 </SelectItem>
                 <SelectItem hideIndicator value="24-hour">
                   {TIMESTAMP_FORMAT_LABELS["24-hour"]}
+                </SelectItem>
+              </SelectPopup>
+            </Select>
+          }
+        />
+        <SettingsRow
+          {...searchableSetting("terminal-renderer")}
+          description="Warp renders the thread terminal with the embedded Warp web build. It starts new Zsh sessions only and needs the local Warp bundle; Ghostty stays the default."
+          resetAction={
+            settings.terminalRenderer !== DEFAULT_UNIFIED_SETTINGS.terminalRenderer ? (
+              <SettingResetButton
+                label="terminal renderer"
+                onClick={() =>
+                  updateSettings({ terminalRenderer: DEFAULT_UNIFIED_SETTINGS.terminalRenderer })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Select
+              value={settings.terminalRenderer}
+              onValueChange={(value) => {
+                if (value === "ghostty" || value === "warp") {
+                  updateSettings({ terminalRenderer: value });
+                }
+              }}
+            >
+              <SelectTrigger size="sm" className="w-full sm:w-48" aria-label="Terminal renderer">
+                <SelectValue>{TERMINAL_RENDERER_LABELS[settings.terminalRenderer]}</SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                <SelectItem hideIndicator value="ghostty">
+                  {TERMINAL_RENDERER_LABELS.ghostty}
+                </SelectItem>
+                <SelectItem hideIndicator value="warp">
+                  {TERMINAL_RENDERER_LABELS.warp}
                 </SelectItem>
               </SelectPopup>
             </Select>

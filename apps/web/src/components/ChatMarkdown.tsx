@@ -18,6 +18,7 @@ import {
   MessageSquareWarningIcon,
   OctagonAlertIcon,
   PlayIcon,
+  TextCursorInputIcon,
   PresentationIcon,
   SparklesIcon,
   TriangleAlertIcon,
@@ -126,6 +127,7 @@ import { Collapsible, CollapsiblePanel, CollapsibleTrigger } from "./ui/collapsi
 import { ScrollArea } from "./ui/scroll-area";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "./ui/menu";
 import { stackedThreadToast, toastManager } from "./ui/toast";
+import { describeWarpRefusal, useVisibleWarpPanel } from "../terminal/warp/registry";
 import { recordVisitForThread } from "../browserHistoryStore";
 import {
   PreferredEditorEnvironmentRequiredError,
@@ -1011,6 +1013,27 @@ function MarkdownCodeBlock({
     // make the rendered command differ from what the terminal would receive.
     !/[\p{Cc}\p{Cf}]/u.test(code.slice(0, -1));
 
+  // Only offered while the experimental Warp terminal is on screen: puts the
+  // command in Warp's input without running it.
+  const warpPanel = useVisibleWarpPanel();
+  const canInsertInWarp = warpPanel !== null && canRun;
+  const handleInsertInWarp = useCallback(() => {
+    if (warpPanel === null) return;
+    void warpPanel.insert(command).then((outcome) => {
+      toastManager.add(
+        stackedThreadToast(
+          outcome.ok
+            ? { type: "info", title: `Inserted into Warp ${outcome.label}` }
+            : {
+                type: "warning",
+                title: "Not inserted into Warp",
+                description: describeWarpRefusal(outcome),
+              },
+        ),
+      );
+    });
+  }, [command, warpPanel]);
+
   const handleCopy = useCallback(() => {
     if (typeof navigator === "undefined" || navigator.clipboard == null) {
       return;
@@ -1113,6 +1136,24 @@ function MarkdownCodeBlock({
                 <WrapTextIcon className="size-3" />
               </TooltipTrigger>
               <TooltipPopup side="top">{wrapLabel}</TooltipPopup>
+            </Tooltip>
+          ) : null}
+          {canInsertInWarp ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost-muted"
+                    size="icon-xs"
+                    onClick={handleInsertInWarp}
+                    aria-label="Insert in Warp"
+                  />
+                }
+              >
+                <TextCursorInputIcon className="size-3" />
+              </TooltipTrigger>
+              <TooltipPopup side="top">Insert in Warp (does not run)</TooltipPopup>
             </Tooltip>
           ) : null}
           {canRun ? (

@@ -78,6 +78,7 @@ import { confirmTerminalClose } from "~/lib/terminalCloseConfirm";
 import { useClientSettings } from "../hooks/useSettings";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useAttachedTerminalSession } from "../state/terminalSessions";
+import { WarpThreadTerminalPanel } from "../terminal/warp/WarpTerminalPanel";
 import { serverEnvironment } from "../state/server";
 import { previewEnvironment } from "../state/preview";
 import { terminalEnvironment } from "../state/terminal";
@@ -1047,7 +1048,7 @@ function TerminalActionButton({ label, className, onClick, children }: TerminalA
   );
 }
 
-export default function ThreadTerminalDrawer({
+function GhosttyThreadTerminalDrawer({
   mode = "drawer",
   threadRef,
   threadId,
@@ -1713,4 +1714,28 @@ export default function ThreadTerminalDrawer({
       </div>
     </aside>
   );
+}
+
+/**
+ * Renderer seam. Ghostty is the default and keeps every existing prop and
+ * behavior; the experimental Warp renderer replaces only the drawer, never the
+ * right-panel terminal surface.
+ */
+export default function ThreadTerminalDrawer(props: ThreadTerminalDrawerProps) {
+  const terminalRenderer = useClientSettings((settings) => settings.terminalRenderer);
+  if (terminalRenderer === "warp" && props.mode !== "panel") {
+    return (
+      <WarpThreadTerminalPanel
+        threadRef={props.threadRef}
+        cwd={props.cwd}
+        worktreePath={props.worktreePath}
+        visible={props.visible ?? true}
+        height={clampDrawerHeight(props.height)}
+        focusRequestId={props.focusRequestId}
+        onHeightChange={props.onHeightChange}
+        onAddTerminalContext={props.onAddTerminalContext}
+      />
+    );
+  }
+  return <GhosttyThreadTerminalDrawer {...props} />;
 }
