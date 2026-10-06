@@ -22,6 +22,7 @@ import { isElectron } from "../../env";
 import { useEnvironments } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { sideQuestShelfCommand } from "./shelfState";
+import { EnvironmentPersonaAvatar, NOFUN_PERSONA, PersonaAvatar } from "../persona";
 
 interface ShelfEntry {
   readonly environmentId: EnvironmentId;
@@ -105,7 +106,13 @@ export function SideQuestShelfPage() {
         <WorkspacePageHeader electron={isElectron} className="h-auto">
           <WorkspaceBreadcrumb ariaLabel="Side Quest breadcrumb" className="min-w-0 py-2">
             <WorkspaceBreadcrumbItem current>
-              <h1>Side Quest</h1>
+              <h1 className="flex items-center gap-2">
+                <PersonaAvatar persona={NOFUN_PERSONA} className="size-4" />
+                Side Quest
+                <span className="font-mono text-3xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  {entries.length > 0 ? `${entries.length} pinned` : ""}
+                </span>
+              </h1>
             </WorkspaceBreadcrumbItem>
           </WorkspaceBreadcrumb>
         </WorkspacePageHeader>
@@ -118,14 +125,22 @@ export function SideQuestShelfPage() {
                     type="button"
                     aria-current={keyOf(entry) === selectedKey ? "true" : undefined}
                     onClick={() => setSelectedKey(keyOf(entry))}
-                    className="flex w-full min-w-0 flex-col gap-0.5 rounded-md px-2.5 py-2 text-start outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
+                    className="flex w-full min-w-0 items-center gap-2.5 rounded-lg px-2 py-2 text-start outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=true]:bg-accent"
                   >
-                    <span className="truncate font-medium text-sm">{entry.pin.title}</span>
-                    <span className="truncate text-muted-foreground text-xs">
-                      {entry.environmentLabel} - {formatTime(entry.pin.createdAt)}
-                      {entry.pin.sourceThreadId === null
-                        ? ""
-                        : ` - thread ${entry.pin.sourceThreadId.slice(0, 8)}`}
+                    <EnvironmentPersonaAvatar
+                      environmentId={entry.environmentId}
+                      className="size-7"
+                    />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="truncate font-semibold text-sm tracking-tight">
+                        {entry.pin.title}
+                      </span>
+                      <span className="truncate text-muted-foreground text-xs">
+                        {entry.environmentLabel} · {formatTime(entry.pin.createdAt)}
+                        {entry.pin.sourceThreadId === null
+                          ? ""
+                          : ` · thread ${entry.pin.sourceThreadId.slice(0, 8)}`}
+                      </span>
                     </span>
                   </button>
                 </li>
@@ -191,6 +206,10 @@ export function SideQuestShelfPage() {
             ) : (
               <Empty>
                 <EmptyHeader>
+                  <PersonaAvatar
+                    persona={NOFUN_PERSONA}
+                    className="mx-auto mb-3 size-12 drop-shadow-md"
+                  />
                   <EmptyTitle>
                     {loaded && entries.length === 0 ? "Nothing pinned" : "Side Quest"}
                   </EmptyTitle>

@@ -16,6 +16,11 @@ export const NofunPersonaInfo = Schema.Struct({
   label: TrimmedNonEmptyString,
   /** CSS color for the persona chip; purely presentational. */
   accent: Schema.optionalKey(TrimmedNonEmptyString),
+  /**
+   * Persona icon id ("nofun" | "catches"); clients map it to a bundled image.
+   * Unknown ids fall back to the No Fun mark, as does a server with no persona.
+   */
+  icon: Schema.optionalKey(TrimmedNonEmptyString),
 });
 export type NofunPersonaInfo = typeof NofunPersonaInfo.Type;
 

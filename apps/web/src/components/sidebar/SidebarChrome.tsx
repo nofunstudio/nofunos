@@ -6,7 +6,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { usePullRequestsSupported } from "../../state/environments";
-import { NoFunMark } from "../../nofun/NoFunMark";
+import { NOFUN_PERSONA, PersonaAvatar } from "../../nofun/persona";
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageBackdropVariant,
@@ -126,13 +126,13 @@ function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
 
 function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
-    // Center the visible capitals, without the font's ascender/descender space.
-    <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
-      <NoFunMark aria-label="No Fun" className="size-[1.1em] shrink-0 self-center" />
+    // Text is trimmed to its capitals, so centering aligns the caps with the icon.
+    <span className="inline-flex min-w-0 items-center gap-1.5 text-sm font-semibold tracking-tight">
+      <PersonaAvatar persona={NOFUN_PERSONA} className="size-[1.3em]" />
       <span className="truncate [text-box:trim-both_cap_alphabetic]">No Fun</span>
       <span
         className={cn(
-          "truncate [text-box:trim-both_cap_alphabetic]",
+          "truncate font-medium [text-box:trim-both_cap_alphabetic]",
           onBackdrop ? "text-white/70" : "text-muted-foreground",
         )}
       >

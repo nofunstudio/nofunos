@@ -7,7 +7,7 @@ import type { ChatFileAttachment } from "~/types";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { nofunArtifactAttachment } from "./artifactDisplay";
-import { NoFunMark } from "./NoFunMark";
+import { PersonaAvatar, usePersonaIdentity } from "./persona";
 import { PinHtmlRenderButton } from "./shelf/PinHtmlRenderButton";
 
 /**
@@ -20,16 +20,18 @@ export function NofunArtifactCard(props: {
   readonly htmlRender: HtmlRenderReference;
   readonly onOpen?: ((attachment: ChatFileAttachment) => void) | undefined;
   readonly pinThreadId?: string | undefined;
-  /** Replaces the "No Fun" badge, e.g. "Variant 2". */
+  /** Replaces the persona badge ("No Fun", "CATCHES"), e.g. "Variant 2". */
   readonly label?: string | undefined;
 }) {
+  const persona = usePersonaIdentity(props.environmentId);
   const open = () => props.onOpen?.(nofunArtifactAttachment(props.htmlRender));
   return (
     <div
       role={props.onOpen ? "button" : undefined}
       tabIndex={props.onOpen ? 0 : undefined}
       aria-label={`Open ${props.htmlRender.title}`}
-      className="flex min-w-0 cursor-pointer items-center gap-3 rounded-xl border border-border bg-card px-3 py-2 text-card-foreground transition-colors hover:bg-accent/40"
+      data-nofun-artifact-card
+      className="group/nofun-card flex min-w-0 cursor-pointer items-center gap-3 rounded-2xl border border-border bg-card p-2 pe-2.5 text-card-foreground shadow-xs/5 transition-colors hover:border-foreground/20 hover:bg-accent/30"
       onClick={open}
       onKeyDown={(event) => {
         if (event.target === event.currentTarget && (event.key === "Enter" || event.key === " ")) {
@@ -38,10 +40,17 @@ export function NofunArtifactCard(props: {
         }
       }}
     >
-      <NoFunMark className="size-5 shrink-0" />
-      <span className="min-w-0 flex-1 truncate font-medium text-sm">{props.htmlRender.title}</span>
+      <PersonaAvatar persona={persona} className="size-9" />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate font-semibold text-sm tracking-tight">
+          {props.htmlRender.title}
+        </span>
+        <span className="truncate font-mono text-3xs uppercase tracking-widest text-muted-foreground">
+          Artifact
+        </span>
+      </span>
       <Badge size="sm" variant="secondary">
-        {props.label ?? "No Fun"}
+        {props.label ?? persona.label}
       </Badge>
       {/* The pin button is its own control; it must not also open the card. */}
       {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Stops the card's click only. */}

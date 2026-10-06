@@ -13,6 +13,13 @@ import { deriveProjectIdentity } from "../projectIdentity";
 import { projectIconColorClassName } from "../projectIconColors";
 import { ProjectMonogram } from "./ProjectMonogram";
 import { cn } from "~/lib/utils";
+import {
+  PersonaAvatar,
+  PersonaMonogram,
+  usePersonaIdentity,
+  useSpansPersonas,
+  type PersonaIdentity,
+} from "~/nofun/persona";
 
 const DynamicIcon = lazy(() =>
   import("lucide-react/dynamic").then((module) => ({ default: module.DynamicIcon })),
@@ -36,6 +43,8 @@ export function ProjectFavicon(input: {
   fallbackIcon?: ComponentType<{ className?: string }>;
 }) {
   const { project } = input;
+  const persona = usePersonaIdentity(project.environmentId);
+  const spansPersonas = useSpansPersonas();
   const src = useAtomValue(
     projectFaviconUrlAtom({
       environmentId: project.environmentId,
@@ -43,6 +52,30 @@ export function ProjectFavicon(input: {
       faviconPath: project.faviconPath,
     }),
   );
+  const glyph = <ProjectFaviconGlyph {...input} persona={persona} src={src} />;
+  const hasOwnIcon =
+    project.projectIcon !== undefined && project.projectIcon !== null
+      ? true
+      : Boolean(src) && !isProjectFaviconFallbackUrl(src ?? "");
+  // A project with its own icon cannot wear the persona squircle, so once more
+  // than one persona is connected it carries a small persona corner badge.
+  if (!spansPersonas || !hasOwnIcon) return glyph;
+  return (
+    <span className="relative inline-flex shrink-0">
+      {glyph}
+      <PersonaAvatar persona={persona} className="absolute -right-1 -bottom-1 size-2.5" />
+    </span>
+  );
+}
+
+function ProjectFaviconGlyph(input: {
+  project: ProjectFaviconProject;
+  className?: string | undefined;
+  fallbackIcon?: ComponentType<{ className?: string }>;
+  persona: PersonaIdentity;
+  src: string | null | undefined;
+}) {
+  const { project, persona, src } = input;
   if (project.projectIcon?.kind === "monogram") {
     return (
       <ProjectMonogram
@@ -88,6 +121,7 @@ export function ProjectFavicon(input: {
         className={input.className}
         icon={FallbackIcon}
         projectName={project.title}
+        persona={persona}
       />
     );
   }
@@ -105,6 +139,7 @@ export function ProjectFavicon(input: {
       className={input.className}
       fallbackIcon={FallbackIcon}
       fallbackProjectName={project.title}
+      persona={persona}
     />
   );
 }
@@ -114,14 +149,20 @@ function ProjectFaviconFallback({
   icon: Icon,
   emoji,
   projectName,
+  persona,
 }: {
   readonly className?: string | undefined;
   readonly icon: ComponentType<{ className?: string }>;
   readonly emoji?: string | undefined;
   readonly projectName?: string | undefined;
+  readonly persona?: PersonaIdentity | undefined;
 }) {
   if (projectName && projectName.trim().length > 0) {
     const identity = deriveProjectIdentity(projectName);
+    // No Fun: a project without its own icon wears its persona's squircle.
+    if (persona) {
+      return <PersonaMonogram persona={persona} text={identity.monogram} className={className} />;
+    }
     return (
       <ProjectMonogram text={identity.monogram} color={identity.color} className={className} />
     );
@@ -149,11 +190,13 @@ function ProjectFaviconImage({
   className,
   fallbackIcon: FallbackIcon,
   fallbackProjectName,
+  persona,
 }: {
   readonly src: string;
   readonly className?: string | undefined;
   readonly fallbackIcon: ComponentType<{ className?: string }>;
   readonly fallbackProjectName?: string | undefined;
+  readonly persona: PersonaIdentity;
 }) {
   const [displayedSrc, setDisplayedSrc] = useState<string | null>(() =>
     src.startsWith("data:image/") ? src : null,
@@ -170,6 +213,7 @@ function ProjectFaviconImage({
           className={className}
           icon={FallbackIcon}
           projectName={fallbackProjectName}
+          persona={persona}
         />
       ) : null}
       {displayedSrc ? (

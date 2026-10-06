@@ -40,6 +40,8 @@ import {
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { InlineButton } from "../ui/button";
 import { resolveProjectSettings } from "@t3tools/shared/projectSettings";
+import { NofunHeroMark } from "~/nofun/PersonaWelcome";
+import { usePersonaIdentity } from "~/nofun/persona";
 
 // Menu value for "No project"; real entries are keyed by logical project key.
 const NO_PROJECT_VALUE = "no-project";
@@ -70,6 +72,7 @@ export function DraftHeroHeadline({
   const openAddProject = useCallback(() => openCommandPalette({ open: "add-project" }), []);
   const { scratchEnvironmentId, scratchWorkspaceRootFor, openScratchProject } = useScratchProject();
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
+  const persona = usePersonaIdentity(activeProjectRef?.environmentId ?? primaryEnvironmentId);
 
   const environmentLabelById = useMemo(
     () =>
@@ -359,6 +362,7 @@ export function DraftHeroHeadline({
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col items-center">
+      <NofunHeroMark persona={persona} />
       <h1
         aria-label={headingLabel}
         className="w-full text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl"
