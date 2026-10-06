@@ -22,8 +22,7 @@ import {
   pageFeatures,
   poolFor,
 } from "../../../nofun/pages/compose.ts";
-// Swap for `import { compilePage } from "@t3tools/nofun-artifacts/compiler"` once the compiler exports it.
-import { compilePage } from "../../../nofun/pages/compilePageShim.ts";
+import { compilePage } from "@t3tools/nofun-artifacts/compiler";
 import {
   composeVariant,
   isWeak,
