@@ -14,7 +14,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "examples": "node examples/render.ts"
+    "examples": "node examples/render.ts",
+    "sync": "node scripts/sync.ts",
+    "examples:live": "node examples/render-live.ts"
   },
   "dependencies": {
     "class-variance-authority": "0.7.1",

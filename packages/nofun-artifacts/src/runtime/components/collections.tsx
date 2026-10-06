@@ -7,9 +7,9 @@
 // - Timeline wraps the ported blocks/data/timeline parts.
 import * as React from "react";
 
-import { Badge } from "../ui/badge.tsx";
-import { Button } from "../ui/button.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.tsx";
+import { Badge } from "@nofun/kobra/badge";
+import { Button } from "@nofun/kobra/button";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@nofun/kobra/table";
 import {
   Timeline as TimelineRoot,
   TimelineBadge,
@@ -24,9 +24,9 @@ import {
   TimelineTime,
   TimelineTitle,
   type TimelineTone,
-} from "../ui/timeline.tsx";
-import { cn } from "../lib/cn.ts";
-import { IconCheck, IconMinus } from "../lib/icons.tsx";
+} from "@nofun/ui/timeline";
+import { cn } from "@nofun/source/lib/utils";
+import { IconCheck, IconMinus } from "@tabler/icons-react";
 
 /* Gallery */
 

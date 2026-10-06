@@ -17,10 +17,9 @@
           "nodeBuiltinImport": "off"
         }
       }
-    ],
-    "paths": {
-      "@nofun/artifacts": ["./src/runtime/index.ts"]
-    }
+    ]
   },
-  "include": ["src", "examples"]
+  "include": ["src", "examples", "scripts"],
+  // The browser runtime imports the live checkout ("@nofun/ui/*", "@nofun/kobra/*"); esbuild checks it.
+  "exclude": ["src/runtime", "examples/*.tsx"]
 }

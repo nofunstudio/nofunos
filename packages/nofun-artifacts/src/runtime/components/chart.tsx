@@ -1,19 +1,23 @@
-// Chart: the No Fun chart-bar/chart-area block shape (ChartFrame card, header with title, description,
-// headline value and legend, then the plot), drawn by the ported SVG plot in ui/chart.tsx.
+// Chart: the real No Fun chart blocks (blocks/charts/chart-bar, chart-area, chart-line on Recharts),
+// framed by their shared shell: ChartFrame card, header with title, description, headline value and
+// legend, then the plot.
+import { ChartAreaPlot } from "@nofun/ui/chart-area";
 import {
   ChartDescription,
   ChartFrame,
   ChartHeader,
   ChartHeading,
   ChartLegendList,
-  ChartPlot,
   ChartTitle,
   ChartValue,
   formatCompact,
-  type ChartDatum,
   type ChartSeries,
-} from "../ui/chart.tsx";
-import { formatNumberValue } from "../lib/format.ts";
+} from "@nofun/ui/chart-area/chart-shell";
+import { ChartBarPlot } from "@nofun/ui/chart-bar";
+import { ChartLinePlot } from "@nofun/ui/chart-line";
+import { formatNumberValue } from "@nofun/ui/number-value/format";
+
+type ChartDatum = Record<string, string | number | null>;
 
 export type ChartProps = {
   type?: "bar" | "line" | "area" | undefined;
@@ -63,6 +67,7 @@ export function Chart({
             maximumFractionDigits: valueFormat === "percent" ? 0 : 1,
           });
   const hasHeader = Boolean(title || description || value || showLegend);
+  const plot = { data, xKey, series, height: height ?? 240, yFormatter: formatter, label: title };
   return (
     <ChartFrame variant={variant} className={className}>
       {hasHeader ? (
@@ -75,16 +80,13 @@ export function Chart({
           {showLegend ? <ChartLegendList series={series} /> : null}
         </ChartHeader>
       ) : null}
-      <ChartPlot
-        type={type}
-        data={data}
-        xKey={xKey}
-        series={series}
-        stacked={stacked}
-        height={height ?? 240}
-        valueFormatter={formatter}
-        label={title}
-      />
+      {type === "line" ? (
+        <ChartLinePlot {...plot} />
+      ) : type === "area" ? (
+        <ChartAreaPlot {...plot} stacked={stacked} />
+      ) : (
+        <ChartBarPlot {...plot} stacked={stacked} />
+      )}
     </ChartFrame>
   );
 }

@@ -3,12 +3,12 @@
 // end) and a Kobra Input filter. Sorting and filtering stay local to the page.
 import * as React from "react";
 
-import { Button } from "../ui/button.tsx";
-import { Input } from "../ui/input.tsx";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table.tsx";
-import { cn } from "../lib/cn.ts";
-import { formatNumberValue } from "../lib/format.ts";
-import { IconArrowDown, IconArrowUp, IconSearch, IconSelector } from "../lib/icons.tsx";
+import { Button } from "@nofun/kobra/button";
+import { Input } from "@nofun/kobra/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@nofun/kobra/table";
+import { cn } from "@nofun/source/lib/utils";
+import { formatNumberValue } from "@nofun/ui/number-value/format";
+import { IconArrowDown, IconArrowUp, IconSearch, IconSelector } from "@tabler/icons-react";
 import { Status, type StatusTone } from "./metric.tsx";
 
 export type CellValue = string | number | boolean | null;

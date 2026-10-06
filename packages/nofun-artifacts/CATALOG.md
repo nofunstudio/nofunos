@@ -1,6 +1,6 @@
 # No Fun artifact catalog
 
-Every component here is ported from, or wraps, real source in `nofun-components` (snapshot at commit `6f1bf2bd`). Paths are relative to that repo. Props and validation live in `src/catalog.ts`.
+Every component here wraps real source in the live `nofun-components` checkout (`NOFUN_COMPONENTS_DIR`), compiled on each call; nothing is snapshotted. Paths are relative to that repo. Props and validation live in `src/catalog.ts`.
 
 ## Semantic components (spec lane and `@nofun/artifacts`)
 

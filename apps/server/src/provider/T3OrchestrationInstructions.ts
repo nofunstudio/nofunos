@@ -12,7 +12,7 @@ Whenever the user asks for an artifact, visual, page, dashboard, chart or mockup
 
 - Find parts first with \`nofun_components_search\` when it is available.
 - Landing pages and full pages: prefer \`nofun_page_compose\` / \`nofun_page_variants\` when available.
-- Otherwise build with \`nofun_artifact_preview\` (self-check), then \`nofun_artifact_render\`, using a catalog \`spec\` when the ten components fit, or custom \`tsx\` importing only \`react\` and \`@nofun/artifacts\`. Theme: \`kobra\`, \`mrch\`, or \`t3\` to follow the app.
+- Otherwise build with \`nofun_artifact_preview\` (self-check), then \`nofun_artifact_render\`: a catalog \`spec\` when the ten components fit, or custom \`tsx\` importing real blocks (\`@nofun/ui/<name>\`, \`@nofun/kobra/<name>\`) plus \`react\`, \`@nofun/artifacts\`, \`@tabler/icons-react\`, \`motion\`, \`recharts\`. Theme: \`kobra\` by default, any No Fun brand id, or \`t3\` to follow the app.
 - Big pages, dashboards, multi-section pages and interactive tools: \`display: "card"\` with \`open: true\`. A small chart or single metric: \`display: "inline"\`.
 - The reader sees the result above your reply; don't announce or restate it.`;
 

@@ -1,6 +1,6 @@
 import { OrchestratorMcpFailure } from "@t3tools/contracts";
 import {
-  ARTIFACT_THEME_IDS,
+  ARTIFACT_ALLOWED_PACKAGES,
   artifactCatalogGuide,
   artifactThemeGuide,
 } from "@t3tools/nofun-artifacts/compiler";
@@ -19,6 +19,7 @@ import * as McpInvocationContext from "../../McpInvocationContext.ts";
 
 export const NOFUN_ARTIFACT_RENDER_TOOL_NAME = "nofun_artifact_render";
 export const NOFUN_ARTIFACT_PREVIEW_TOOL_NAME = "nofun_artifact_preview";
+export const NOFUN_COMPONENTS_SEARCH_TOOL_NAME = "nofun_components_search";
 
 const SPEC_EXAMPLE = JSON.stringify({
   root: {
@@ -58,12 +59,12 @@ const SPEC_EXAMPLE = JSON.stringify({
   },
 });
 
-const TSX_EXAMPLE = `import { useState } from "react"; import { Stack, Button, DataTable } from "@nofun/artifacts"; const ROWS = [...]; export default function App() { const [only, setOnly] = useState(false); return <Stack><Button size="sm" onClick={() => setOnly(!only)}>Open only</Button><DataTable columns={[...]} rows={only ? ROWS.filter((r) => r.open) : ROWS} /></Stack>; }`;
+const TSX_EXAMPLE = `import { useState } from "react"; import { Stack, Button, DataTable } from "@nofun/artifacts"; import { ChartArea, ChartAreaPlot } from "@nofun/ui/chart-area"; const ROWS = [...]; export default function App() { const [only, setOnly] = useState(false); return <Stack><ChartArea><ChartAreaPlot data={ROWS} xKey="week" series={[{ key: "orders", label: "Orders" }]} /></ChartArea><Button size="sm" onClick={() => setOnly(!only)}>Open only</Button><DataTable columns={[...]} rows={only ? ROWS.filter((r) => r.open) : ROWS} /></Stack>; }`;
 
 export const NOFUN_ARTIFACT_GUIDE = [
   "Builds a No Fun artifact from the real No Fun component library (Kobra primitives and No Fun blocks) and a No Fun theme, as one self-contained page. Text stays primary: use it only when a dashboard, chart, table, comparison, timeline or gallery says more than prose, and only with real data you read from tools or the user. Never invent metrics, progress or verification badges.",
   `Two lanes, pass exactly one. spec: a JSON object {"root": node}, node = {"component", "props", "children"?}. Components (* = required prop):\n${artifactCatalogGuide()}\nExample spec: ${SPEC_EXAMPLE}`,
-  `tsx: custom React when the catalog would force a worse result (custom layout, interaction). It must \`export default\` a component and may import only "react" and "@nofun/artifacts", which exports the ten components above plus the Kobra primitives Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter, Badge, Button (variant default|outline|secondary|ghost, size default|sm|xs), Input, Table parts, Kpi parts, TrendChip, NumberValue, Sparkline, ChartFrame/ChartPlot, Separator, Skeleton, Empty parts, cn and formatNumberValue. Style with Tailwind classes on the theme tokens (bg-card, text-muted-foreground, border-border, bg-accent-brand, rounded-brand, micro, display-m); no other imports, no network calls. Example: ${TSX_EXAMPLE}`,
+  `tsx: custom React compiled against the live No Fun library (~280 real blocks: heroes, charts, data, effects, AI, forms, navigation, landing sections...). It must \`export default\` a component. Imports: "react"; any block as "@nofun/ui/<registry-name>" (find names, exports and props with ${NOFUN_COMPONENTS_SEARCH_TOOL_NAME}; "@nofun/ui/<name>/demo" is a working example of each); Kobra primitives as "@nofun/kobra/<name>" (button, card, badge, table, tabs, dialog...); "@nofun/artifacts" (the ten components above plus Card, Badge, Button, Input, Table and Kpi parts, TrendChip, NumberValue, Sparkline, cn, formatNumberValue); and ${ARTIFACT_ALLOWED_PACKAGES.filter((p) => !p.startsWith("react")).join(", ")}. Style with Tailwind on the theme tokens (bg-card, text-muted-foreground, border-border, bg-canvas, text-ink, micro, display-m). No network calls. Example: ${TSX_EXAMPLE}`,
   `theme: ${artifactThemeGuide()} Default kobra. The theme only styles the page; it never changes the account or thread. The page follows the reader's light/dark mode.`,
   "Unknown components, props or imports fail with a message naming each problem and its path; fix and call again.",
 ].join("\n\n");
@@ -82,15 +83,15 @@ const ArtifactInput = {
     }),
   ),
   theme: Schema.optional(
-    Schema.Literals(ARTIFACT_THEME_IDS).annotate({
-      description: "No Fun theme. Defaults to kobra.",
+    Schema.String.check(Schema.isMaxLength(64)).annotate({
+      description: "No Fun brand id (design system) or t3. Defaults to kobra.",
     }),
   ),
 };
 
 const ArtifactStats = Schema.Struct({
   theme: Schema.String,
-  lane: Schema.Literals(["spec", "tsx"]),
+  lane: Schema.Literals(["spec", "tsx", "page"]),
   bytes: Schema.Int,
   compileMs: Schema.Int,
 });
@@ -192,6 +193,47 @@ export const NofunArtifactRenderTool = Tool.make(NOFUN_ARTIFACT_RENDER_TOOL_NAME
   .annotate(Tool.Destructive, false)
   .annotate(Tool.Idempotent, false)
   .annotate(Tool.OpenWorld, true);
+
+export const NofunComponentsSearchTool = Tool.make(NOFUN_COMPONENTS_SEARCH_TOOL_NAME, {
+  description:
+    'Search the live No Fun component library (nofun-components: blocks, Kobra-based components and brands, commerce excluded) for an artifact. Returns the best matches with the import to use in nofun_artifact_* tsx ("@nofun/ui/<name>"), a working demo import, prop hints and style tags. Query by what you need ("kpi cards", "area chart", "hero with big type", "kanban", "shader background"); search again rather than guessing names.',
+  parameters: Schema.Struct({
+    query: Schema.String.check(Schema.isMaxLength(200)),
+    category: Schema.optional(
+      Schema.String.check(Schema.isMaxLength(40)).annotate({
+        description:
+          "Optional group: ai, charts, controls, data, effects, feedback, forms, gallery, heroes, interactions, landing, marketing, navigation, onboarding, overlays, sections, showcase, ui; or kind: block, component, brand.",
+      }),
+    ),
+    limit: Schema.optional(Schema.Int.annotate({ description: "1-20, default 8." })),
+  }),
+  success: Schema.Struct({
+    source: Schema.String,
+    matches: Schema.Array(
+      Schema.Struct({
+        name: Schema.String,
+        kind: Schema.String,
+        category: Schema.String,
+        title: Schema.String,
+        description: Schema.String,
+        import: Schema.optional(Schema.String),
+        snippet: Schema.optional(Schema.String),
+        demo: Schema.optional(Schema.String),
+        style: Schema.Array(Schema.String),
+        props: Schema.Array(Schema.String),
+        brand: Schema.optional(Schema.String),
+      }),
+    ),
+  }),
+  failure: OrchestratorMcpFailure,
+})
+  .annotate(Tool.Title, "Search No Fun components")
+  .annotate(Tool.Readonly, true)
+  .annotate(Tool.Destructive, false)
+  .annotate(Tool.Idempotent, true)
+  .annotate(Tool.OpenWorld, false);
+
+export const NofunComponentsSearchToolkit = Toolkit.make(NofunComponentsSearchTool);
 
 export const NofunArtifactPreviewToolkit = Toolkit.make(NofunArtifactPreviewTool);
 

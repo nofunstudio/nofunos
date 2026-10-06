@@ -1,13 +1,15 @@
-// The `@nofun/artifacts` module custom TSX artifacts import. Semantic components first, then the
-// ported Kobra primitives they are built from, for layouts the catalog does not cover.
+// The `@nofun/artifacts` module generated TSX imports: the semantic artifact components, built on the
+// real No Fun blocks and Kobra primitives from the live nofun-components checkout, plus those
+// primitives re-exported for layouts the semantic components do not cover. For anything else, import
+// the real component directly: "@nofun/ui/<registry-name>" or "@nofun/kobra/<primitive>".
 export { Stack, Grid, Text } from "./components/layout.tsx";
 export { Metric, Status } from "./components/metric.tsx";
 export { DataTable } from "./components/data-table.tsx";
 export { Chart } from "./components/chart.tsx";
 export { Gallery, Comparison, Timeline } from "./components/collections.tsx";
 
-export { Badge } from "./ui/badge.tsx";
-export { Button } from "./ui/button.tsx";
+export { Badge } from "@nofun/kobra/badge";
+export { Button } from "@nofun/kobra/button";
 export {
   Card,
   CardContent,
@@ -16,7 +18,7 @@ export {
   CardHeader,
   CardTitle,
   CardAction,
-} from "./ui/card.tsx";
+} from "@nofun/kobra/card";
 export {
   Empty,
   EmptyContent,
@@ -24,8 +26,8 @@ export {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "./ui/empty.tsx";
-export { Input } from "./ui/input.tsx";
+} from "@nofun/kobra/empty";
+export { Input } from "@nofun/kobra/input";
 export {
   Kpi,
   KpiFooter,
@@ -35,10 +37,10 @@ export {
   KpiMain,
   KpiTrend,
   KpiValue,
-} from "./ui/kpi.tsx";
-export { NumberValue } from "./ui/number-value.tsx";
-export { Separator } from "./ui/separator.tsx";
-export { Skeleton } from "./ui/skeleton.tsx";
+} from "@nofun/ui/kpi";
+export { NumberValue } from "@nofun/ui/number-value";
+export { Separator } from "@nofun/kobra/separator";
+export { Skeleton } from "@nofun/kobra/skeleton";
 export {
   Table,
   TableBody,
@@ -48,20 +50,19 @@ export {
   TableHead,
   TableHeader,
   TableRow,
-} from "./ui/table.tsx";
-export { TrendChip } from "./ui/trend-chip.tsx";
+} from "@nofun/kobra/table";
+export { TrendChip } from "@nofun/ui/trend-chip";
 export {
   ChartDescription,
   ChartFrame,
   ChartHeader,
   ChartHeading,
   ChartLegendList,
-  ChartPlot,
   ChartTitle,
   ChartValue,
-  Sparkline,
-} from "./ui/chart.tsx";
-export * as TimelineParts from "./ui/timeline.tsx";
+} from "@nofun/ui/chart-area/chart-shell";
+export { Sparkline } from "@nofun/ui/sparkline";
+export * as TimelineParts from "@nofun/ui/timeline";
 
-export { cn } from "./lib/cn.ts";
-export { formatNumberValue } from "./lib/format.ts";
+export { cn } from "@nofun/source/lib/utils";
+export { formatNumberValue } from "@nofun/ui/number-value/format";

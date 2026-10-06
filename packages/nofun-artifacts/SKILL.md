@@ -16,7 +16,7 @@ Use real data only, from tools, files or the user. Never invent metrics, progres
 ## Pick a lane
 
 - **spec** (preferred): a JSON object `{"root": node}`, where `node = {"component", "props", "children"?}`. There are 10 components: Stack, Grid, Text, Metric, Status, DataTable, Chart, Gallery, Comparison and Timeline. The tool description lists every prop, and `CATALOG.md` says which No Fun source each one comes from. Only Stack and Grid take children.
-- **tsx**: use custom React when the catalog would force a worse result, such as a custom layout or interaction. It must `export default` a component, and it may import only `react` and `@nofun/artifacts`. That module exports the ten components plus the Kobra primitives (Card parts, Badge, Button, Input, Table parts, Kpi parts, TrendChip, Sparkline, ChartFrame/ChartPlot, Separator, Skeleton, Empty parts, `cn`, `formatNumberValue`). Style with Tailwind classes on the theme tokens, such as `bg-card`, `text-muted-foreground`, `border-border`, `bg-accent-brand`, `rounded-brand`, `micro` and `display-m`. You can't import anything else, fetch anything, or use Node APIs.
+- **tsx**: use custom React when the catalog would force a worse result, such as a custom layout or interaction. It must `export default` a component. It compiles against the live No Fun library: import any block as `@nofun/ui/<registry-name>` (find it with `nofun_components_search`; `@nofun/ui/<name>/demo` is a working example), Kobra primitives as `@nofun/kobra/<name>`, the ten components and common primitives from `@nofun/artifacts`, plus `react`, `@tabler/icons-react`, `motion/react` and `recharts`. Style with Tailwind classes on the theme tokens, such as `bg-card`, `text-muted-foreground`, `border-border`, `bg-canvas`, `text-ink`, `micro` and `display-m`. You can't import anything else, fetch anything, or use Node APIs.
 
 Example specs are in `examples/dashboard.spec.json` and `examples/comparison.tsx`.
 
@@ -24,6 +24,7 @@ Example specs are in `examples/dashboard.spec.json` and `examples/comparison.tsx
 
 - `kobra`: No Fun's stock neutral look. This is the default.
 - `mrch`: lime accent, rounder corners, pill controls, mono body type and uppercase display.
+- Any other No Fun brand id (hoopla, mesa-form, smudge-club, ...) themes the page with that brand's design system.
 - `t3`: follows the reader's T3 theme live.
 
 The theme only styles the page. It never changes the account, thread or permissions. Light and dark follow the reader's mode in every theme.
