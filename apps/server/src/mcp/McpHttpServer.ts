@@ -36,6 +36,9 @@ import * as McpSessionRegistry from "./McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "./PreviewAutomationBroker.ts";
 import * as OrchestratorHandlers from "./toolkits/orchestrator/handlers.ts";
 import { OrchestratorToolkit } from "./toolkits/orchestrator/tools.ts";
+import * as MuseHandlers from "./toolkits/muse/handlers.ts";
+import { MuseToolkit } from "./toolkits/muse/tools.ts";
+import * as MuseWorkerBridge from "../nofun/MuseWorkerBridge.ts";
 import * as PreviewHandlers from "./toolkits/preview/handlers.ts";
 import {
   PreviewSnapshotTool,
@@ -714,6 +717,11 @@ export const layerOrchestratorToolkit = McpServer.toolkit(OrchestratorToolkit).p
   Layer.provide(ThreadMetadataMcpService.layer),
 );
 
+export const layerMuseToolkit = McpServer.toolkit(MuseToolkit).pipe(
+  Layer.provide(MuseHandlers.layer),
+  Layer.provide(MuseWorkerBridge.layer),
+);
+
 export const layerThreadToolkit = McpServer.toolkit(ThreadToolkit).pipe(
   Layer.provide(ThreadHandlers.layer),
 );
@@ -766,6 +774,7 @@ const layerMcpTransport = McpServer.layerHttp({
 export const layer = Layer.mergeAll(
   layerPreviewToolkit,
   layerOrchestratorToolkit,
+  layerMuseToolkit,
   layerThreadToolkit,
   layerAttachmentRegistration,
   layerProjectRegistration,
