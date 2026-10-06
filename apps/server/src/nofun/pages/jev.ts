@@ -3,8 +3,9 @@
 // pre-screen. Everything Jev-specific lives in this file so it can be deleted without touching the rest of the
 // page tools: Claude is the default page author; Jev only selects and orders pre-built candidates.
 //
-// Gateway key: read at runtime from the file named by NOFUN_GATEWAY_ENV_FILE, only the AI_GATEWAY_API_KEY line,
-// held in memory, never logged, printed or persisted. Each gateway request is logged (no key, no prompt bodies)
+// Gateway key: T3's own secret store (<state dir>/secrets/nofun-ai-gateway.bin, imported once with
+// scripts/nofun/import-gateway-key.ts). NOFUN_GATEWAY_ENV_FILE is an explicit fallback that reads only the
+// AI_GATEWAY_API_KEY line. Held in memory, never logged, printed or persisted. Each gateway request is logged (no key, no prompt bodies)
 // as one JSON line in <state dir>/nofun/jev-ledger.jsonl.
 import * as NodeFSP from "node:fs/promises";
 import * as NodePath from "node:path";
@@ -22,7 +23,7 @@ import { blockTags } from "./ontologyFilter.ts";
 import { childrenOf, summarize, type FlatSpec } from "./spec.ts";
 
 export const JEV_MODEL = "typesafe-ai/jev";
-const DEFAULT_ENV_FILE = "/Users/nofun/Documents/GitHub/mrch-agent/.env";
+export const GATEWAY_SECRET_NAME = "nofun-ai-gateway";
 const KEY_NAME = "AI_GATEWAY_API_KEY";
 
 export class JevUnavailableError extends Error {
@@ -32,16 +33,33 @@ export class JevUnavailableError extends Error {
   }
 }
 
-/** Reads only the AI_GATEWAY_API_KEY line of the configured env file. */
-export async function readGatewayKey(env: NodeJS.ProcessEnv = process.env): Promise<string> {
-  const file = env.NOFUN_GATEWAY_ENV_FILE?.trim() || DEFAULT_ENV_FILE;
+/** Reads the key from T3's secret store, else from the AI_GATEWAY_API_KEY line of NOFUN_GATEWAY_ENV_FILE. */
+export async function readGatewayKey(
+  stateDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
+  try {
+    const stored = (
+      await NodeFSP.readFile(
+        NodePath.join(stateDir, "secrets", `${GATEWAY_SECRET_NAME}.bin`),
+        "utf8",
+      )
+    ).trim();
+    if (stored) return stored;
+  } catch {
+    // Not imported yet; try the explicit env-file fallback.
+  }
+  const file = env.NOFUN_GATEWAY_ENV_FILE?.trim();
+  if (!file) {
+    throw new JevUnavailableError(
+      "no gateway key in T3's secret store (run node scripts/nofun/import-gateway-key.ts)",
+    );
+  }
   let text: string;
   try {
     text = await NodeFSP.readFile(file, "utf8");
   } catch {
-    throw new JevUnavailableError(
-      "the gateway env file could not be read (set NOFUN_GATEWAY_ENV_FILE)",
-    );
+    throw new JevUnavailableError("the NOFUN_GATEWAY_ENV_FILE file could not be read");
   }
   for (const line of text.split("\n")) {
     const m = line.match(new RegExp(`^\\s*(?:export\\s+)?${KEY_NAME}\\s*=\\s*(.*?)\\s*$`));
@@ -73,7 +91,7 @@ async function writeLedger(stateDir: string, row: LedgerRow) {
 
 /** Evaluator that logs every gateway request to the ledger and stops past a request budget. */
 export async function makeEvaluator(stateDir: string, purpose: { value: string }, budget: number) {
-  const apiKey = await readGatewayKey();
+  const apiKey = await readGatewayKey(stateDir);
   const base = createEvaluator({ model: JEV_MODEL, apiKey, timeoutMs: 60_000 });
   let used = 0;
   const evaluate: Experimental_CompositionEvaluator = async (req) => {
