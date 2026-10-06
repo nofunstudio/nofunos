@@ -1,3 +1,4 @@
+// @effect-diagnostics nodeBuiltinImport:off globalConsole:off - Host-side setup script, not server code.
 // Copies the Vercel AI Gateway key into a No Fun T3 home's secret store, never printing it.
 //   node scripts/nofun/import-gateway-key.ts --home ~/.nofun-t3/nofun [--from /path/to/.env]
 // Without --from, the key is read from stdin (paste, then Ctrl-D).
