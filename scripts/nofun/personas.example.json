@@ -1,0 +1,63 @@
+{
+  "$comment": "Copy to ~/.nofun-t3/personas.json. Paths only: never put tokens, cookies or API keys here. Claude instances set homePath (= CLAUDE_CONFIG_DIR); Codex instances set homePath (= CODEX_HOME). Never share a CODEX_HOME across personas.",
+  "personas": {
+    "nofun": {
+      "label": "No Fun",
+      "accent": "#e8e6df",
+      "port": 3790,
+      "homeDir": "~/.nofun-t3/nofun",
+      "allowedProjectRoots": ["~/Documents/GitHub"],
+      "providerInstances": {
+        "claude_nofun": {
+          "driver": "claudeAgent",
+          "displayName": "No Fun Claude",
+          "homePath": "~/.claude"
+        },
+        "codex_nofun": {
+          "driver": "codex",
+          "displayName": "No Fun Codex",
+          "homePath": "~/.codex"
+        }
+      },
+      "browserProfiles": ["nofun-analytics"]
+    },
+    "catches": {
+      "label": "CATCHES",
+      "accent": "#ff5a36",
+      "port": 3791,
+      "homeDir": "~/.nofun-t3/catches",
+      "allowedProjectRoots": ["~/Documents/GitHub/catches"],
+      "providerInstances": {
+        "claude_catches_a": {
+          "driver": "claudeAgent",
+          "displayName": "CATCHES Claude A",
+          "homePath": "~/.nofun-t3/claude-catches-a"
+        },
+        "claude_catches_b": {
+          "driver": "claudeAgent",
+          "displayName": "CATCHES Claude B",
+          "homePath": "~/.nofun-t3/claude-catches-b"
+        },
+        "codex_catches": {
+          "driver": "codex",
+          "displayName": "CATCHES Codex",
+          "homePath": "~/.nofun-t3/codex-catches"
+        }
+      },
+      "browserProfiles": ["catches-claude-a", "catches-claude-b"]
+    }
+  },
+  "browserProfileUrls": {
+    "catches-claude-a": "https://claude.ai/",
+    "catches-claude-b": "https://claude.ai/",
+    "nofun-analytics": "https://analytics.getmrch.com/inbox"
+  },
+  "billingOverrideEnvNames": [
+    "ANTHROPIC_API_KEY",
+    "ANTHROPIC_AUTH_TOKEN",
+    "OPENAI_API_KEY",
+    "META_API_KEY",
+    "CLAUDE_CONFIG_DIR",
+    "CODEX_HOME"
+  ]
+}

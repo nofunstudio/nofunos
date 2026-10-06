@@ -15,10 +15,13 @@ export async function addBrowserSurface<E>(input: {
   readonly openPreview: OpenPreviewMutation<E>;
   /** Omit to use the configured default profile. */
   readonly profileId?: string | undefined;
+  /** Start page, e.g. a persona profile's home URL. */
+  readonly url?: string | undefined;
 }): Promise<AtomCommandResult<void, E | BrowserSettingsReadError>> {
   const result = await openPreviewSession({
     openPreview: input.openPreview,
     threadRef: input.threadRef,
+    ...(input.url === undefined ? {} : { url: input.url }),
     ...(input.profileId === undefined ? {} : { profileId: input.profileId }),
   });
   return mapAtomCommandResult(result, (snapshot) => {

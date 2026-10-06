@@ -31,6 +31,7 @@ import * as ProjectStore from "../orchestration-v2/ProjectStore.ts";
 import * as ThreadCommandExecutor from "../orchestration-v2/ThreadCommandExecutor.ts";
 import { planThreadDeletion } from "../orchestration-v2/ThreadDeletion.ts";
 import * as ProjectEnrichmentService from "./ProjectEnrichmentService.ts";
+import { personaRootViolation, readNofunPersonaScope } from "../nofun/persona.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
 
 export interface ProjectCreateInput extends ProjectCreatePayload {
@@ -223,6 +224,11 @@ export const make = Effect.gen(function* () {
     const { projectId } = command;
     const dispatchError = (cause: unknown) =>
       new ProjectOperationError({ operation: "dispatch-project-command", projectId, cause });
+    // No Fun persona boundary: a persona server refuses roots outside its scope.
+    if (command.type !== "project.delete" && command.workspaceRoot !== undefined) {
+      const violation = personaRootViolation(readNofunPersonaScope(), command.workspaceRoot);
+      if (violation !== undefined) return yield* dispatchError(violation);
+    }
     const workspaceRoot = command.type === "project.delete" ? undefined : command.workspaceRoot;
     const planAndCommit = Effect.gen(function* () {
       const project = Option.getOrUndefined(yield* readRow(projectId, { includeDeleted: true }));
