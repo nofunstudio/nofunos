@@ -2715,6 +2715,7 @@ function HtmlRenderTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "htm
         environmentId={ctx.activeThreadEnvironmentId}
         htmlRender={row.htmlRender}
         onOpen={ctx.onFileOpen}
+        {...(ctx.threadRef ? { pinThreadId: ctx.threadRef.threadId } : {})}
       />
     </div>
   );
