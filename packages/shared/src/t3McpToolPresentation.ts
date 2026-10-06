@@ -323,6 +323,10 @@ const T3_MCP_TOOLS: Readonly<Record<string, T3McpToolDefinition>> = {
     ["Render", "Rendering", "Rendered", "a No Fun artifact"],
     "html-render",
   ),
+  nofun_components_search: tool(
+    ["Search", "Searching", "Searched", "No Fun components"],
+    "thread-search",
+  ),
 };
 
 /**

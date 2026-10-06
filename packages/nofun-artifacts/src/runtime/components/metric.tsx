@@ -1,10 +1,10 @@
-// Metric composes the ported Kobra KPI card (blocks/charts/kpi), TrendChip and Sparkline.
+// Metric composes the real No Fun KPI card (blocks/charts/kpi), TrendChip and Sparkline blocks.
 // Status is the Kobra Badge with the tone mapping the timeline block uses (blocks/data/timeline).
-import { Badge } from "../ui/badge.tsx";
-import { Sparkline } from "../ui/chart.tsx";
-import { Kpi, KpiFooter, KpiHeader, KpiLabel, KpiMain, KpiTrend, KpiValue } from "../ui/kpi.tsx";
-import { cn } from "../lib/cn.ts";
-import type { NumberValueFormat } from "../lib/format.ts";
+import { Badge } from "@nofun/kobra/badge";
+import { Sparkline } from "@nofun/ui/sparkline";
+import { Kpi, KpiFooter, KpiHeader, KpiLabel, KpiMain, KpiTrend, KpiValue } from "@nofun/ui/kpi";
+import { cn } from "@nofun/source/lib/utils";
+import type { NumberValueFormat } from "@nofun/ui/number-value/format";
 
 export type StatusTone = "neutral" | "info" | "success" | "warning" | "danger" | "primary";
 
@@ -101,10 +101,17 @@ export function Metric({
       </KpiMain>
       {trend && trend.length > 1 ? (
         <div className="px-(--card-spacing)">
-          <Sparkline data={trend} invert={invert} label={`${label} trend`} />
+          <Sparkline data={trend} tone={trendTone(trend, invert)} label={`${label} trend`} />
         </div>
       ) : null}
       {footer ? <KpiFooter>{footer}</KpiFooter> : null}
     </Kpi>
   );
+}
+
+/** The sparkline reads green when the series moved the good way (down, for an inverted metric). */
+function trendTone(trend: number[], invert: boolean | undefined): "success" | "error" | "neutral" {
+  if (trend.length < 2) return "neutral";
+  const up = trend[trend.length - 1]! >= trend[0]!;
+  return up !== Boolean(invert) ? "success" : "error";
 }

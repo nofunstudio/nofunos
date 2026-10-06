@@ -3,6 +3,8 @@ import {
   ArtifactCompileError,
   ArtifactSpecError,
   compileArtifact,
+  searchComponents,
+  sourceStamp,
   type ArtifactCompileInput,
   type CompiledArtifact,
 } from "@t3tools/nofun-artifacts/compiler";
@@ -22,6 +24,7 @@ import {
   NofunArtifactPreviewTool,
   NofunArtifactPreviewToolkit,
   NofunArtifactRenderToolkit,
+  NofunComponentsSearchToolkit,
   type NofunArtifactToolkit,
 } from "./tools.ts";
 
@@ -115,6 +118,22 @@ const handlers = {
     }),
 } satisfies Parameters<typeof NofunArtifactToolkit.toLayer>[0];
 
+const layerSearchHandlers = NofunComponentsSearchToolkit.toLayer({
+  // Reads the live nofun-components index (registry.json + ontology); never the whole index.
+  nofun_components_search: (input) =>
+    Effect.tryPromise({
+      try: async () => ({
+        source: await sourceStamp(),
+        matches: await searchComponents(input),
+      }),
+      catch: (error) =>
+        new OrchestratorMcpFailure({
+          code: "orchestration_error",
+          message: `No Fun component search failed: ${error instanceof Error ? error.message : String(error)}`,
+        }),
+    }).pipe(Effect.withSpan("NofunComponents.search")),
+});
+
 const layerPreviewHandlers = NofunArtifactPreviewToolkit.toLayer({
   nofun_artifact_preview: handlers.nofun_artifact_preview,
 });
@@ -149,6 +168,7 @@ export const makeLayer = (registerImageTool: typeof McpHttpServer.registerImageT
   });
   return Layer.mergeAll(
     McpServer.toolkit(NofunArtifactRenderToolkit).pipe(Layer.provide(layerRenderHandlers)),
+    McpServer.toolkit(NofunComponentsSearchToolkit).pipe(Layer.provide(layerSearchHandlers)),
     Layer.effectDiscard(registerPreview()).pipe(Layer.provide(layerPreviewHandlers)),
   ).pipe(Layer.provide(HtmlRender.layer));
 };

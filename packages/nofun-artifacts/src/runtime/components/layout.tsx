@@ -3,7 +3,7 @@
 // display transform and weight from registry/nofun-ui/themes/base.css.
 import * as React from "react";
 
-import { cn } from "../lib/cn.ts";
+import { cn } from "@nofun/source/lib/utils";
 
 const GAP = { none: "0px", sm: "0.5rem", md: "1rem", lg: "1.5rem", xl: "2.5rem" } as const;
 export type Gap = keyof typeof GAP;
