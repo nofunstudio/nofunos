@@ -33,6 +33,8 @@ ACP fallback: some ACP agents accept the injected MCP server but fail to expose 
 ### Showing visuals
 
 When a chart, table, diagram, image collage, or mockup would say more than prose, build a self-contained HTML page, check it with \`html_preview\`, then publish it with \`html_render\` before your final reply. The reader sees the page above that reply, so don't announce or restate it; add only what it doesn't say.
+
+For dashboards, metrics, charts, data tables, comparisons, timelines and galleries, prefer the No Fun artifact tools over hand-written HTML: \`nofun_artifact_preview\` then \`nofun_artifact_render\` build the page from the real No Fun components and a No Fun theme (\`kobra\`, \`mrch\`, or \`t3\` to follow the app). Pass a catalog \`spec\` when the ten components fit, or custom \`tsx\` importing only \`react\` and \`@nofun/artifacts\` when they don't. Text stays primary: use a visual only when it says more than prose, and only with real data.
 `;
 
 export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `

@@ -1,0 +1,177 @@
+{
+  "title": "Studio pulse (example data)",
+  "root": {
+    "component": "Stack",
+    "props": { "gap": "lg" },
+    "children": [
+      {
+        "component": "Stack",
+        "props": { "gap": "sm" },
+        "children": [
+          {
+            "component": "Text",
+            "props": { "variant": "micro", "text": "Example data · week 40" }
+          },
+          { "component": "Text", "props": { "variant": "title", "text": "Studio pulse" } },
+          {
+            "component": "Text",
+            "props": {
+              "variant": "muted",
+              "text": "Orders and storefront health for the last eight weeks. Fixture numbers, shown to exercise the catalog."
+            }
+          }
+        ]
+      },
+      {
+        "component": "Grid",
+        "props": { "columns": 4, "minColumnWidth": 180 },
+        "children": [
+          {
+            "component": "Metric",
+            "props": {
+              "label": "Revenue",
+              "value": 48210,
+              "format": "currency",
+              "maximumFractionDigits": 0,
+              "change": 12.4,
+              "trend": [31, 34, 33, 38, 41, 39, 44, 48],
+              "footer": "vs previous week"
+            }
+          },
+          {
+            "component": "Metric",
+            "props": {
+              "label": "Orders",
+              "value": 1284,
+              "change": 6.1,
+              "trend": [980, 1010, 1100, 1060, 1150, 1190, 1210, 1284],
+              "footer": "vs previous week"
+            }
+          },
+          {
+            "component": "Metric",
+            "props": {
+              "label": "Refund rate",
+              "value": 0.021,
+              "format": "percent",
+              "maximumFractionDigits": 1,
+              "change": -0.4,
+              "invert": true,
+              "trend": [3.1, 2.9, 2.8, 2.6, 2.5, 2.4, 2.5, 2.1],
+              "footer": "lower is better"
+            }
+          },
+          {
+            "component": "Metric",
+            "props": {
+              "label": "Checkout p95",
+              "value": 842,
+              "unit": "ms",
+              "change": 3.2,
+              "invert": true,
+              "trend": [760, 790, 770, 805, 810, 800, 825, 842],
+              "status": { "label": "Watch", "tone": "warning" }
+            }
+          }
+        ]
+      },
+      {
+        "component": "Chart",
+        "props": {
+          "type": "bar",
+          "title": "Weekly revenue",
+          "description": "Storefront and wholesale, last eight weeks",
+          "value": "$48.2K",
+          "xKey": "week",
+          "valueFormat": "currency",
+          "stacked": true,
+          "series": [
+            { "key": "storefront", "label": "Storefront" },
+            { "key": "wholesale", "label": "Wholesale", "color": "chart-2" }
+          ],
+          "data": [
+            { "week": "W33", "storefront": 22400, "wholesale": 8600 },
+            { "week": "W34", "storefront": 24100, "wholesale": 9900 },
+            { "week": "W35", "storefront": 23800, "wholesale": 9200 },
+            { "week": "W36", "storefront": 26900, "wholesale": 11100 },
+            { "week": "W37", "storefront": 29300, "wholesale": 11700 },
+            { "week": "W38", "storefront": 27600, "wholesale": 11400 },
+            { "week": "W39", "storefront": 31200, "wholesale": 12800 },
+            { "week": "W40", "storefront": 34500, "wholesale": 13710 }
+          ]
+        }
+      },
+      {
+        "component": "DataTable",
+        "props": {
+          "caption": "Top products this week",
+          "filterable": true,
+          "maxRows": 5,
+          "columns": [
+            { "key": "product", "label": "Product" },
+            { "key": "units", "label": "Units", "format": "number" },
+            { "key": "revenue", "label": "Revenue", "format": "currency" },
+            { "key": "margin", "label": "Margin", "format": "percent" },
+            {
+              "key": "stock",
+              "label": "Stock",
+              "format": "status",
+              "tones": { "Healthy": "success", "Low": "warning", "Out": "danger" }
+            }
+          ],
+          "rows": [
+            {
+              "product": "Heavyweight tee, bone",
+              "units": 312,
+              "revenue": 9360,
+              "margin": 0.46,
+              "stock": "Healthy"
+            },
+            {
+              "product": "Ringer tee, lime",
+              "units": 241,
+              "revenue": 7230,
+              "margin": 0.44,
+              "stock": "Low"
+            },
+            {
+              "product": "Zip hoodie, ink",
+              "units": 118,
+              "revenue": 8260,
+              "margin": 0.39,
+              "stock": "Healthy"
+            },
+            {
+              "product": "Five-panel cap",
+              "units": 96,
+              "revenue": 2880,
+              "margin": 0.52,
+              "stock": "Out"
+            },
+            {
+              "product": "Tote, natural",
+              "units": 88,
+              "revenue": 1760,
+              "margin": 0.58,
+              "stock": "Healthy"
+            },
+            {
+              "product": "Long sleeve, ash",
+              "units": 74,
+              "revenue": 2960,
+              "margin": 0.41,
+              "stock": "Low"
+            },
+            {
+              "product": "Sticker pack",
+              "units": 210,
+              "revenue": 1050,
+              "margin": 0.71,
+              "stock": "Healthy"
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

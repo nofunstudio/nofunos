@@ -1,0 +1,35 @@
+{
+  "name": "@t3tools/nofun-artifacts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./compiler": {
+      "types": "./src/compiler.ts",
+      "import": "./src/compiler.ts"
+    },
+    "./catalog": {
+      "types": "./src/catalog.ts",
+      "import": "./src/catalog.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "examples": "node examples/render.ts"
+  },
+  "dependencies": {
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "esbuild": "0.28.2",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
+    "tailwind-merge": "3.6.0",
+    "tailwindcss": "catalog:"
+  },
+  "devDependencies": {
+    "@t3tools/shared": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "~19.3.0",
+    "@types/react-dom": "~19.2.3",
+    "playwright-core": "1.60.0"
+  }
+}
