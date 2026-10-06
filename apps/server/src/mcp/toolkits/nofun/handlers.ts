@@ -15,6 +15,7 @@ import * as Stream from "effect/Stream";
 import { AiError, McpServer } from "effect/ai";
 
 import * as HtmlRender from "../../../htmlRender/HtmlRender.ts";
+import * as PageHandlers from "./pageHandlers.ts";
 import type * as McpHttpServer from "../../McpHttpServer.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import { readMutationCaller } from "../../threadAccess.ts";
@@ -150,5 +151,6 @@ export const makeLayer = (registerImageTool: typeof McpHttpServer.registerImageT
   return Layer.mergeAll(
     McpServer.toolkit(NofunArtifactRenderToolkit).pipe(Layer.provide(layerRenderHandlers)),
     Layer.effectDiscard(registerPreview()).pipe(Layer.provide(layerPreviewHandlers)),
+    PageHandlers.makeLayer(),
   ).pipe(Layer.provide(HtmlRender.layer));
 };
