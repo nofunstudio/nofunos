@@ -9,6 +9,8 @@ import { useEffect } from "react";
 import { useClientSettings } from "~/hooks/useSettings";
 import type { ChatFileAttachment } from "~/types";
 
+import { markNofunArtifact } from "./artifactPanel";
+
 /** A result this fresh arrived live; older ones are history reloading. */
 const LIVE_WINDOW_MS = 30_000;
 
@@ -47,6 +49,7 @@ export function resolveNofunArtifactBehavior(
 }
 
 export function nofunArtifactAttachment(htmlRender: HtmlRenderReference): ChatFileAttachment {
+  markNofunArtifact(htmlRender.attachmentId);
   return {
     type: "file",
     id: htmlRender.attachmentId,

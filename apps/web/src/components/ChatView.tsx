@@ -257,6 +257,7 @@ import { BrowserSettingsReadError, openUrlInPreview } from "../browser/openFileI
 import { resolveDiscoveredServerUrl } from "../browser/browserTargetResolver";
 import { previewRuntimeTabId } from "../browser/previewRuntimeTabId";
 import { addBrowserSurface } from "./preview/addBrowserSurface";
+import { NofunWidePanelToggle, useNofunWidePanel } from "~/nofun/artifactPanel";
 import { nofunProfileHomeUrl } from "~/nofun/PersonaChip";
 import { closePreviewSession } from "./preview/closePreviewSession";
 import { ThreadPreviewMiniPlayer } from "./preview/ThreadPreviewMiniPlayer";
@@ -2330,6 +2331,11 @@ export default function ChatView(props: ChatViewProps) {
   const canMaximizeRightPanel = rightPanelOpen && !shouldUsePlanSidebarSheet;
   const rightPanelMaximized =
     canMaximizeRightPanel && maximizedRightPanelThreadKey === routeThreadKey;
+  const nofunWidePanel = useNofunWidePanel(
+    renderedRightPanelSurface,
+    previewPanelInlineSize,
+    workspaceLayoutWidth ?? undefined,
+  );
   const inlineRightPanelOwnsTitleBar = rightPanelOpen && !shouldUsePlanSidebarSheet;
   const [threadPanelPresentation, setThreadPanelPresentation] =
     useState<ThreadPanelPresentation>("inline");
@@ -10924,6 +10930,9 @@ export default function ChatView(props: ChatViewProps) {
           )}
           inert={!rightPanelOpen}
         >
+          {nofunWidePanel.artifactId !== null && !rightPanelMaximized ? (
+            <NofunWidePanelToggle wide={nofunWidePanel.wide} onToggle={nofunWidePanel.toggle} />
+          ) : null}
           <RightPanelMaximizeControl
             maximized={rightPanelMaximized}
             onToggle={toggleRightPanelMaximized}
@@ -11601,7 +11610,7 @@ export default function ChatView(props: ChatViewProps) {
           mode="inline"
           open={rightPanelOpen}
           maximized={rightPanelMaximized}
-          inlineSize={previewPanelInlineSize}
+          inlineSize={nofunWidePanel.inlineSize}
           surfaces={renderedRightPanelSurfaces}
           environmentId={activeThreadRef.environmentId}
           activeSurfaceId={renderedRightPanelSurface?.id ?? null}

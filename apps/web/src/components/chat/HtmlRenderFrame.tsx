@@ -8,6 +8,7 @@ import {
 import { Maximize2Icon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { markNofunArtifact } from "../../nofun/artifactPanel";
 import { PinHtmlRenderButton } from "../../nofun/shelf/PinHtmlRenderButton";
 
 import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
@@ -122,7 +123,9 @@ export function HtmlRenderFrame(props: {
                       aria-label="Open in panel"
                       size="icon-xs"
                       variant="glass"
-                      onClick={() =>
+                      onClick={() => {
+                        // Only No Fun results carry a display; they get the wide panel.
+                        if (props.htmlRender.display !== undefined) markNofunArtifact(attachmentId);
                         props.onOpen?.({
                           type: "file",
                           id: attachmentId,
@@ -131,8 +134,8 @@ export function HtmlRenderFrame(props: {
                           // Unknown here; the preview leaves it out.
                           sizeBytes: 0,
                           htmlRender: true,
-                        })
-                      }
+                        });
+                      }}
                     />
                   }
                 >

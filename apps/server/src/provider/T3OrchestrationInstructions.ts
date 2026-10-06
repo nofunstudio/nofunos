@@ -1,5 +1,32 @@
 import type { ProviderInteractionMode } from "@t3tools/contracts";
 
+import { readNofunPersonaScope } from "../nofun/persona.ts";
+
+const GENERIC_VISUALS = `### Showing visuals
+
+When a chart, table, diagram, image collage, or mockup would say more than prose, build a self-contained HTML page, check it with \`html_preview\`, then publish it with \`html_render\` before your final reply. The reader sees the page above that reply, so don't announce or restate it; add only what it doesn't say.`;
+
+const NOFUN_VISUALS = `### Visual output (No Fun)
+
+Whenever the user asks for an artifact, visual, page, dashboard, chart or mockup, use the No Fun artifact tools. Never use plain \`html_render\` or hand-written HTML for these, and the user will not remind you. Text stays primary: only use a visual when it says more than prose, with real data.
+
+- Find parts first with \`nofun_components_search\` when it is available.
+- Landing pages and full pages: prefer \`nofun_page_compose\` / \`nofun_page_variants\` when available.
+- Otherwise build with \`nofun_artifact_preview\` (self-check), then \`nofun_artifact_render\`, using a catalog \`spec\` when the ten components fit, or custom \`tsx\` importing only \`react\` and \`@nofun/artifacts\`. Theme: \`kobra\`, \`mrch\`, or \`t3\` to follow the app.
+- Big pages, dashboards, multi-section pages and interactive tools: \`display: "card"\` with \`open: true\`. A small chart or single metric: \`display: "inline"\`.
+- The reader sees the result above your reply; don't announce or restate it.`;
+
+const CATCHES_VISUALS = `### Visual output (CATCHES)
+
+Whenever the user asks for an artifact, visual, page or dashboard, it must be a hosted Claude artifact on claude.ai, so everyone at CATCHES can open it with share permissions. Never use the No Fun artifact tools or No Fun components here, and never plain \`html_render\`. If you are Claude and have the \`Artifact\` tool, write the page and publish it with that. If you are any other provider, or \`Artifact\` is unavailable, call \`delegate_task\` to a Claude child (see \`orchestrator_capabilities\`) to make the artifact and return its link. Text stays primary: only use a visual when it says more than prose.`;
+
+/** A server with no persona is the No Fun default; only the CATCHES persona differs. */
+export function visualOutputInstructions(personaId: string | undefined): string {
+  if (personaId === undefined || personaId === "nofun") return NOFUN_VISUALS;
+  if (personaId === "catches") return CATCHES_VISUALS;
+  return GENERIC_VISUALS;
+}
+
 export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `
 
 ## T3 Code orchestration
@@ -31,12 +58,7 @@ Tool names may include a harness-normalized MCP prefix, such as \`mcp__t3_code__
 
 ACP fallback: some ACP agents accept the injected MCP server but fail to expose its tools. When the T3 tools are absent and \`T3_ACP_MCP_NODE\` is present, call the same tools through the terminal: \`ELECTRON_RUN_AS_NODE=1 "$T3_ACP_MCP_NODE" \${T3_ACP_MCP_ENTRYPOINT:+"$T3_ACP_MCP_ENTRYPOINT"} acp-mcp-call orchestrator_capabilities '{}'\` (\`T3_ACP_MCP_ENTRYPOINT\` is unset when T3 runs as a standalone executable). Delegate with \`acp-mcp-call delegate_task '{"task":"...","target":{"providerInstanceId":"...","model":"..."},"mode":"async","clientRequestId":"..."}'\`. This is the supported T3 transport fallback, not an ordinary shell-based substitute for delegation.
 
-### Showing visuals
-
-When a chart, table, diagram, image collage, or mockup would say more than prose, build a self-contained HTML page, check it with \`html_preview\`, then publish it with \`html_render\` before your final reply. The reader sees the page above that reply, so don't announce or restate it; add only what it doesn't say.
-
-For dashboards, metrics, charts, data tables, comparisons, timelines and galleries, prefer the No Fun artifact tools over hand-written HTML: \`nofun_artifact_preview\` then \`nofun_artifact_render\` build the page from the real No Fun components and a No Fun theme (\`kobra\`, \`mrch\`, or \`t3\` to follow the app). Pass a catalog \`spec\` when the ten components fit, or custom \`tsx\` importing only \`react\` and \`@nofun/artifacts\` when they don't. Text stays primary: use a visual only when it says more than prose, and only with real data. Pass \`display\` to \`nofun_artifact_render\`: a small chart or single metric shows \`inline\`; a dashboard, multi-section page or interactive tool should be \`display: "card"\` with \`open: true\`. Left unset, specs with three or more top-level children and any \`tsx\` default to a card that opens in the side panel, and everything else shows inline.
-`;
+${visualOutputInstructions(readNofunPersonaScope()?.info.id)}`;
 
 export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `
 
