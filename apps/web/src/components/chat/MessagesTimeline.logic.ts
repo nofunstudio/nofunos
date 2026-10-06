@@ -595,6 +595,7 @@ type MessagesTimelineRowContent =
       id: string;
       createdAt: string;
       htmlRender: HtmlRenderReference;
+      htmlRenders?: ReadonlyArray<HtmlRenderReference>;
     };
 
 export interface StableMessagesTimelineRowsState {
@@ -1622,6 +1623,7 @@ export function deriveMessagesTimelineRows(input: {
         id: timelineEntry.id,
         createdAt: timelineEntry.createdAt,
         htmlRender: timelineEntry.htmlRender,
+        ...(timelineEntry.htmlRenders ? { htmlRenders: timelineEntry.htmlRenders } : {}),
       });
       continue;
     }
@@ -2039,7 +2041,14 @@ function isRowUnchanged(a: MessagesTimelineRow, b: MessagesTimelineRow): boolean
     case "html-render": {
       // Entries rebuild on any tool update; an equal page must keep its mounted frame.
       const bh = b as typeof a;
-      return a.createdAt === bh.createdAt && htmlRenderReferencesEqual(a.htmlRender, bh.htmlRender);
+      const left = a.htmlRenders ?? [];
+      const right = bh.htmlRenders ?? [];
+      return (
+        a.createdAt === bh.createdAt &&
+        htmlRenderReferencesEqual(a.htmlRender, bh.htmlRender) &&
+        left.length === right.length &&
+        left.every((entry, index) => htmlRenderReferencesEqual(entry, right[index]!))
+      );
     }
 
     case "event":

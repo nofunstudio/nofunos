@@ -21,7 +21,7 @@ import {
   formatSearchToolLabel,
 } from "@t3tools/shared/toolActivity";
 import type { HtmlRenderReference } from "@t3tools/shared/htmlRender";
-import { htmlRenderFromToolItem } from "@t3tools/shared/toolOutput";
+import { htmlRendersFromToolItem } from "@t3tools/shared/toolOutput";
 import {
   contextCompactionLabel,
   workEntryIndicatesToolFailure,
@@ -139,6 +139,8 @@ export type TimelineEntry = (
       readonly createdAt: string;
       readonly runId: RunId | null;
       readonly htmlRender: HtmlRenderReference;
+      /** Every variant a No Fun variants tool published (the first equals `htmlRender`). */
+      readonly htmlRenders?: ReadonlyArray<HtmlRenderReference>;
     }
   | {
       readonly id: string;
@@ -698,10 +700,11 @@ export function deriveTimelineEntriesFromVisibleTurnItems(
       continue;
     }
 
-    const htmlRender =
+    const htmlRenders =
       item.type === "dynamic_tool" && item.status === "completed"
-        ? htmlRenderFromToolItem(item)
-        : undefined;
+        ? htmlRendersFromToolItem(item)
+        : [];
+    const htmlRender = htmlRenders[0];
     if (htmlRender !== undefined) {
       entries.push({
         id: item.id,
@@ -709,6 +712,7 @@ export function deriveTimelineEntriesFromVisibleTurnItems(
         createdAt,
         runId: item.runId,
         htmlRender,
+        ...(htmlRenders.length > 1 ? { htmlRenders } : {}),
         ...attemptMetadata,
       });
       continue;

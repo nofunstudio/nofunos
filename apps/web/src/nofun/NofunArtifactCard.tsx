@@ -20,6 +20,8 @@ export function NofunArtifactCard(props: {
   readonly htmlRender: HtmlRenderReference;
   readonly onOpen?: ((attachment: ChatFileAttachment) => void) | undefined;
   readonly pinThreadId?: string | undefined;
+  /** Replaces the "No Fun" badge, e.g. "Variant 2". */
+  readonly label?: string | undefined;
 }) {
   const open = () => props.onOpen?.(nofunArtifactAttachment(props.htmlRender));
   return (
@@ -39,7 +41,7 @@ export function NofunArtifactCard(props: {
       <NoFunMark className="size-5 shrink-0" />
       <span className="min-w-0 flex-1 truncate font-medium text-sm">{props.htmlRender.title}</span>
       <Badge size="sm" variant="secondary">
-        No Fun
+        {props.label ?? "No Fun"}
       </Badge>
       {/* The pin button is its own control; it must not also open the card. */}
       {/* oxlint-disable-next-line jsx-a11y/no-static-element-interactions -- Stops the card's click only. */}

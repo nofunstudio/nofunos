@@ -108,6 +108,19 @@ export const NofunArtifactPrototypeTool = Tool.make(NOFUN_ARTIFACT_PROTOTYPE_TOO
         autoOpen: Schema.optional(Schema.Boolean),
       }),
     ),
+    // Every published layout in variant order, so clients can show one card per variant.
+    htmlRenders: Schema.optional(
+      Schema.Array(
+        Schema.Struct({
+          attachmentId: Schema.String,
+          title: Schema.String,
+          height: Schema.Number,
+          heights: Schema.optional(Schema.Array(Schema.Tuple([Schema.Int, Schema.Int]))),
+          display: Schema.optional(Schema.Literals(["inline", "card"])),
+          autoOpen: Schema.optional(Schema.Boolean),
+        }),
+      ),
+    ),
     requests: Schema.Int,
     summary: Schema.String,
     message: Schema.String,

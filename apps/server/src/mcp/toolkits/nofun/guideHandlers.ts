@@ -171,12 +171,15 @@ const layerPrototypeHandlers = NofunArtifactPrototypeToolkit.toLayer({
         composer,
         variants,
         ...("htmlRender" in first && first.htmlRender ? { htmlRender: first.htmlRender } : {}),
+        htmlRenders: variants.flatMap((v) =>
+          "htmlRender" in v && v.htmlRender ? [v.htmlRender] : [],
+        ),
         requests: evaluator._tag === "Success" ? evaluator.success.requestsUsed() : 0,
         summary: table,
         message:
           composer === "rhythm"
-            ? `Jev was unavailable${evaluator._tag === "Failure" ? ` (${String(evaluator.failure).slice(0, 160)})` : ""}, so these are deterministic role-based orderings. Layouts are published as closed cards (the thread shows variant 1; the rest are in the list). Pick one, then refine it with nofun_artifact_preview and nofun_artifact_render.`
-            : "Layouts are published as closed cards (the thread shows variant 1; the rest are in the list). Pick one, then refine it with nofun_artifact_preview and nofun_artifact_render.",
+            ? `Jev was unavailable${evaluator._tag === "Failure" ? ` (${String(evaluator.failure).slice(0, 160)})` : ""}, so these are deterministic role-based orderings. Layouts are published as closed cards (the thread shows every variant as a card). Pick one, then refine it with nofun_artifact_preview and nofun_artifact_render.`
+            : "Layouts are published as closed cards (the thread shows every variant as a card). Pick one, then refine it with nofun_artifact_preview and nofun_artifact_render.",
         ...playbookFor({ thread }),
       };
     }),

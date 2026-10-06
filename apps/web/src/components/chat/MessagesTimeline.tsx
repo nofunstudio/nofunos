@@ -257,6 +257,7 @@ import { useOpenPrLink } from "~/lib/openPullRequestLink";
 import { useClientSettings } from "~/hooks/useSettings";
 import { useNofunArtifactBehavior } from "../../nofun/artifactDisplay";
 import { NofunArtifactCard } from "../../nofun/NofunArtifactCard";
+import { NofunVariantCards } from "../../nofun/NofunVariantCards";
 import type { ChatMarkdownContextReference } from "../ChatMarkdown";
 import { useMediaQuery } from "~/hooks/useMediaQuery";
 import { cn } from "~/lib/utils";
@@ -2712,7 +2713,14 @@ function HtmlRenderTimelineRow({ row }: { row: Extract<TimelineRow, { kind: "htm
 
   return (
     <div className="min-w-0 px-1">
-      {behavior.display === "card" ? (
+      {row.htmlRenders !== undefined && row.htmlRenders.length > 1 ? (
+        <NofunVariantCards
+          environmentId={ctx.activeThreadEnvironmentId}
+          htmlRenders={row.htmlRenders}
+          onOpen={ctx.onFileOpen}
+          pinThreadId={ctx.threadRef?.threadId}
+        />
+      ) : behavior.display === "card" ? (
         <NofunArtifactCard
           key={row.htmlRender.attachmentId}
           environmentId={ctx.activeThreadEnvironmentId}

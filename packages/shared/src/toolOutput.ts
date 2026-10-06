@@ -36,6 +36,7 @@ interface CompactToolOutput {
   scheduledTaskId?: string;
   status?: "rolled_back";
   htmlRender?: HtmlRenderReference;
+  htmlRenders?: HtmlRenderReference[];
   thread?: { threadId: string };
   threads?: Array<{ threadId?: string; status?: "rolled_back" }>;
 }
@@ -121,6 +122,12 @@ export function compactDynamicToolOutput(value: unknown): CompactToolOutput | un
     if (data.status === "rolled_back") output.status = "rolled_back";
     const htmlRender = readHtmlRenderReference(data.htmlRender);
     if (htmlRender !== undefined) output.htmlRender = htmlRender;
+    if (Array.isArray(data.htmlRenders)) {
+      const htmlRenders = data.htmlRenders
+        .slice(0, MAX_HTML_RENDERS)
+        .flatMap((entry) => readHtmlRenderReference(entry) ?? []);
+      if (htmlRenders.length > 0) output.htmlRenders = htmlRenders;
+    }
     const nestedThreadId = Predicate.isObject(data.thread)
       ? boundedId(data.thread.threadId)
       : undefined;
@@ -164,6 +171,8 @@ export function compactDynamicToolOutput(value: unknown): CompactToolOutput | un
   return Object.keys(output).length === 0 ? undefined : output;
 }
 
+const MAX_HTML_RENDERS = 12;
+
 /** No Fun tools whose result carries a top-level `htmlRender` with display hints. */
 const NOFUN_HTML_RENDER_TOOLS: ReadonlySet<string> = new Set([
   "nofun_artifact_render",
@@ -186,6 +195,22 @@ export function htmlRenderFromToolItem(item: {
   // T3's own html_render never carries No Fun display hints.
   const { display: _display, autoOpen: _autoOpen, ...plain } = htmlRender;
   return plain;
+}
+
+/**
+ * Every page a completed tool call published: the No Fun variants tools list all of them in `htmlRenders`;
+ * anything else falls back to the single reference.
+ */
+export function htmlRendersFromToolItem(item: {
+  readonly toolName: string | null | undefined;
+  readonly output?: unknown;
+}): HtmlRenderReference[] {
+  const single = htmlRenderFromToolItem(item);
+  if (single === undefined) return [];
+  const toolId = resolveT3McpToolId(item.toolName);
+  if (!NOFUN_HTML_RENDER_TOOLS.has(toolId ?? "")) return [single];
+  const many = compactDynamicToolOutput(item.output)?.htmlRenders;
+  return many !== undefined && many.length > 0 ? many : [single];
 }
 
 /** Some providers report completion even when command output describes a failure. */

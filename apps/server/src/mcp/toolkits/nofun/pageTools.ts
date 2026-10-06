@@ -195,6 +195,8 @@ export const NofunPageVariantsTool = Tool.make(NOFUN_PAGE_VARIANTS_TOOL_NAME, {
         verdict: Schema.NullOr(Schema.String),
       }),
     ),
+    // Every published variant in order, so clients can show one card per variant.
+    htmlRenders: Schema.optional(Schema.Array(HtmlReference)),
     summary: Schema.String,
     message: Schema.String,
     playbook: Schema.optional(Schema.String),

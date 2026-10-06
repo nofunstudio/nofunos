@@ -337,6 +337,9 @@ const handlers = {
         brand: pool.brand.id,
         requests: evaluator.requestsUsed(),
         variants,
+        htmlRenders: variants.flatMap((v) =>
+          "htmlRender" in v && v.htmlRender ? [v.htmlRender] : [],
+        ),
         dropped: dropped.map(({ p, id, j }) => ({
           id,
           blocks: p.blocks.join(" > "),
