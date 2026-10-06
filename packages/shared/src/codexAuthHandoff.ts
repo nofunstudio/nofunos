@@ -85,7 +85,7 @@ export function codexCallbackUrl(value: string, redirectUri: string, state: stri
 }
 
 export function codexAuthHandoffUrl(input: CodexAuthHandoff, development = false) {
-  const url = new URL(`${development ? "t3code-dev" : "t3code"}://auth/codex`);
+  const url = new URL(`${development ? "nofun-t3-dev" : "nofun-t3"}://auth/codex`);
   url.searchParams.set("request", encodeHandoff(input));
   return url.toString();
 }

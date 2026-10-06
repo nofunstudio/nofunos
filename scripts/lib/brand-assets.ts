@@ -1,17 +1,17 @@
 export const BRAND_ASSET_PATHS = {
   developmentIconComposerProject: "assets/dev/app-icon.icon",
-  developmentIosIconPng: "assets/dev/blueprint-ios-1024.png",
-  developmentUniversalIconPng: "assets/dev/blueprint-universal-1024.png",
+  developmentIosIconPng: "assets/nofun/nofun-ios-1024.png",
+  developmentUniversalIconPng: "assets/nofun/nofun-universal-1024.png",
 
   productionIconComposerProject: "assets/prod/app-icon.icon",
-  productionIosIconPng: "assets/prod/black-ios-1024.png",
-  productionMacIconPng: "assets/prod/black-macos-1024.png",
-  productionLinuxIconPng: "assets/prod/black-universal-1024.png",
-  productionWindowsIconIco: "assets/prod/t3-black-windows.ico",
-  productionWebFaviconIco: "assets/prod/t3-black-web-favicon.ico",
-  productionWebFavicon16Png: "assets/prod/t3-black-web-favicon-16x16.png",
-  productionWebFavicon32Png: "assets/prod/t3-black-web-favicon-32x32.png",
-  productionWebAppleTouchIconPng: "assets/prod/t3-black-web-apple-touch-180.png",
+  productionIosIconPng: "assets/nofun/nofun-ios-1024.png",
+  productionMacIconPng: "assets/nofun/nofun-macos-1024.png",
+  productionLinuxIconPng: "assets/nofun/nofun-universal-1024.png",
+  productionWindowsIconIco: "assets/nofun/nofun-windows.ico",
+  productionWebFaviconIco: "assets/nofun/nofun-web-favicon.ico",
+  productionWebFavicon16Png: "assets/nofun/nofun-web-favicon-16x16.png",
+  productionWebFavicon32Png: "assets/nofun/nofun-web-favicon-32x32.png",
+  productionWebAppleTouchIconPng: "assets/nofun/nofun-web-apple-touch-180.png",
 
   nightlyIconComposerProject: "assets/nightly/app-icon.icon",
   nightlyIosIconPng: "assets/nightly/nightly-ios-1024.png",
@@ -23,12 +23,12 @@ export const BRAND_ASSET_PATHS = {
   nightlyWebFavicon32Png: "assets/nightly/nightly-web-favicon-32x32.png",
   nightlyWebAppleTouchIconPng: "assets/nightly/nightly-web-apple-touch-180.png",
 
-  developmentDesktopIconPng: "assets/dev/blueprint-macos-1024.png",
-  developmentWindowsIconIco: "assets/dev/blueprint-windows.ico",
-  developmentWebFaviconIco: "assets/dev/blueprint-web-favicon.ico",
-  developmentWebFavicon16Png: "assets/dev/blueprint-web-favicon-16x16.png",
-  developmentWebFavicon32Png: "assets/dev/blueprint-web-favicon-32x32.png",
-  developmentWebAppleTouchIconPng: "assets/dev/blueprint-web-apple-touch-180.png",
+  developmentDesktopIconPng: "assets/nofun/nofun-macos-1024.png",
+  developmentWindowsIconIco: "assets/nofun/nofun-windows.ico",
+  developmentWebFaviconIco: "assets/nofun/nofun-web-favicon.ico",
+  developmentWebFavicon16Png: "assets/nofun/nofun-web-favicon-16x16.png",
+  developmentWebFavicon32Png: "assets/nofun/nofun-web-favicon-32x32.png",
+  developmentWebAppleTouchIconPng: "assets/nofun/nofun-web-apple-touch-180.png",
 } as const;
 
 export type WebAssetBrand = "development" | "nightly" | "production";

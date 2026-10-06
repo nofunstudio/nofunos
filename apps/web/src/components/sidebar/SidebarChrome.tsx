@@ -6,7 +6,7 @@ import { Link, useLocation, useNavigate } from "@tanstack/react-router";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import { usePullRequestsSupported } from "../../state/environments";
-import { T3Wordmark } from "../T3Wordmark";
+import { NoFunMark } from "../../nofun/NoFunMark";
 import {
   resolveEnvironmentIdentificationPillLabel,
   resolveSidebarStageBackdropVariant,
@@ -126,14 +126,15 @@ function SidebarBrandMark({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     // Center the visible capitals, without the font's ascender/descender space.
     <span className="inline-flex min-w-0 items-baseline gap-1 text-sm font-medium tracking-tight">
-      <T3Wordmark aria-label="T3" className="h-[1cap] w-auto shrink-0" />
+      <NoFunMark aria-label="No Fun" className="size-[1.1em] shrink-0 self-center" />
+      <span className="truncate [text-box:trim-both_cap_alphabetic]">No Fun</span>
       <span
         className={cn(
           "truncate [text-box:trim-both_cap_alphabetic]",
           onBackdrop ? "text-white/70" : "text-muted-foreground",
         )}
       >
-        Code
+        T3
       </span>
     </span>
   );
