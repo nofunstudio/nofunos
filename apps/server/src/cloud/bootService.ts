@@ -36,11 +36,11 @@ import {
   type ServiceState,
 } from "./serviceProtocol.ts";
 
-const BOOT_SERVICE_NAME = "t3code";
+const BOOT_SERVICE_NAME = "nofun-t3";
 const BOOT_SERVICE_UNIT_FILE = `${BOOT_SERVICE_NAME}.service`;
 // `.service` suffix keeps the label distinct from the desktop app's bundle id
-// (com.t3tools.t3code), so launchd and TCC records never collide.
-const BOOT_SERVICE_LAUNCHD_LABEL = "com.t3tools.t3code.service";
+// (io.nofun.t3), so launchd and TCC records never collide.
+const BOOT_SERVICE_LAUNCHD_LABEL = "io.nofun.t3.service";
 const BOOT_SERVICE_PLIST_FILE = `${BOOT_SERVICE_LAUNCHD_LABEL}.plist`;
 const BOOT_SERVICE_UNIT_ENV = "T3_BOOT_SERVICE_UNIT";
 /** File in the logs dir that receives the service's stdout and stderr. `t3 triage` points agents at it. */
