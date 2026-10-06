@@ -36,6 +36,7 @@ import * as McpSessionRegistry from "./McpSessionRegistry.ts";
 import * as PreviewAutomationBroker from "./PreviewAutomationBroker.ts";
 import * as OrchestratorHandlers from "./toolkits/orchestrator/handlers.ts";
 import { OrchestratorToolkit } from "./toolkits/orchestrator/tools.ts";
+import { readNofunPersonaScope } from "../nofun/persona.ts";
 import * as MuseHandlers from "./toolkits/muse/handlers.ts";
 import { MuseToolkit } from "./toolkits/muse/tools.ts";
 import * as MuseWorkerBridge from "../nofun/MuseWorkerBridge.ts";
@@ -771,10 +772,13 @@ const layerMcpTransport = McpServer.layerHttp({
   protocols: [McpProtocol.v2025_06_18],
 }).pipe(Layer.provide(layerMcpAuthMiddleware));
 
+// CATCHES agents never reach Muse, and publish Claude artifacts instead of No Fun ones.
+const isCatchesPersona = readNofunPersonaScope()?.info.id === "catches";
+
 export const layer = Layer.mergeAll(
   layerPreviewToolkit,
   layerOrchestratorToolkit,
-  layerMuseToolkit,
+  isCatchesPersona ? Layer.empty : layerMuseToolkit,
   layerThreadToolkit,
   layerAttachmentRegistration,
   layerProjectRegistration,
@@ -784,5 +788,5 @@ export const layer = Layer.mergeAll(
   layerPullRequestsToolkit,
   layerDeviceToolkit,
   layerHtmlToolkit,
-  NofunArtifactHandlers.makeLayer(registerImageTool),
+  isCatchesPersona ? Layer.empty : NofunArtifactHandlers.makeLayer(registerImageTool),
 ).pipe(Layer.provideMerge(layerMcpTransport));
