@@ -1866,7 +1866,9 @@ const make = Effect.gen(function* () {
           requestKey: key,
           operation: "delegate-task",
         });
-        const taskId = IdAllocator.delegatedTaskNodeId({ commandId });
+        // Deterministic for a given command id, so a retry finds the prior task;
+        // a fresh dispatch reports the id the orchestrator actually stored.
+        let taskId = IdAllocator.delegatedTaskNodeId({ commandId });
         const existingTask = parent.subagents.find(
           (task) => task.id === taskId && task.origin === "app_owned",
         );
@@ -1941,6 +1943,7 @@ const make = Effect.gen(function* () {
               "Delegated task command did not produce a task projection.",
             );
           }
+          taskId = taskEvent.event.payload.id;
         }
 
         if (input.mode !== "wait") {
