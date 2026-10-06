@@ -77,6 +77,7 @@ import {
   WindowsDesktopBuildPrerequisitesMissingError,
   WindowsPackagedPayloadValidationError,
   WINDOWS_NATIVE_ASAR_UNPACK_GLOB,
+  NOFUN_ARTIFACTS_ASAR_UNPACK_GLOBS,
   stageCursorSdkPlatformPackages,
   WINDOWS_PACKAGED_PAYLOAD_FILE_LIMIT,
   WINDOWS_SERVER_ASAR_IGNORE_GLOBS,
@@ -632,8 +633,9 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       // stay archived. Other platforms retain electron-builder's defaults.
       assert.notProperty(mac, "asar");
       assert.notProperty(linux, "asar");
-      assert.notProperty(mac, "asarUnpack");
-      assert.notProperty(linux, "asarUnpack");
+      // ...except the No Fun artifact compiler, which esbuild must read from real paths.
+      assert.deepStrictEqual(mac.asarUnpack, [...NOFUN_ARTIFACTS_ASAR_UNPACK_GLOBS]);
+      assert.deepStrictEqual(linux.asarUnpack, [...NOFUN_ARTIFACTS_ASAR_UNPACK_GLOBS]);
       assert.deepStrictEqual(win.asar, { smartUnpack: false });
       assert.deepStrictEqual(win.asarUnpack, [WINDOWS_NATIVE_ASAR_UNPACK_GLOB]);
       assert.deepStrictEqual(winWithoutWslRuntime.asar, win.asar);

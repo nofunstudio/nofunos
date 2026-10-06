@@ -945,7 +945,7 @@ interface StagePackageJson {
 
 export const STAGE_INSTALL_ARGS = ["install", "--prod"] as const;
 // esbuild's Go binary reads the artifact compiler's sources and runs from real paths, never app.asar.
-const NOFUN_ARTIFACTS_ASAR_UNPACK_GLOBS = [
+export const NOFUN_ARTIFACTS_ASAR_UNPACK_GLOBS = [
   "**/node_modules/@t3tools/nofun-artifacts/**/*",
   "**/node_modules/@esbuild/**/*",
 ] as const;
