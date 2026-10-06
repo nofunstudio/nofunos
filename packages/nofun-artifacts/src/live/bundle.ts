@@ -300,8 +300,14 @@ export function formatMessages(dir: string, messages: ReadonlyArray<esbuild.Mess
 const tokenCache = new Map<string, { mtime: number; tokens: string[] }>();
 
 /** Tokens that might be Tailwind classes. Tailwind ignores the ones that are not. */
+// Arbitrary values may quote inside their brackets, as in [grid-template-areas:'sep_content'], so
+// splitting on quotes alone never yields them; collect bracketed classes whole as well.
+const BRACKETED_CLASS = /[\w:!@/.-]*\[[^\]\s]*['"][^\]\s]*\][\w/:.%-]*/g;
+
 export function candidatesOf(source: string): string[] {
-  return source.split(/[\s"'`]+/).filter((token) => token.length > 0 && token.length < 300);
+  const tokens = source.split(/[\s"'`]+/);
+  for (const match of source.matchAll(BRACKETED_CLASS)) tokens.push(match[0]);
+  return tokens.filter((token) => token.length > 0 && token.length < 300);
 }
 
 export function candidatesOfFiles(files: Iterable<string>): Set<string> {
