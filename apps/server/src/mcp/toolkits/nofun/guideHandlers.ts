@@ -98,10 +98,13 @@ const layerPrototypeHandlers = NofunArtifactPrototypeToolkit.toLayer({
           Array.from({ length: count }, (_, i) => i),
           (i) =>
             Effect.tryPromise({
-              try: () => {
-                purpose.value = `prototype v${i + 1}`;
-                return jevOrder(sections, input.brief, i, evaluator.success.evaluate);
-              },
+              try: () =>
+                jevOrder(
+                  sections,
+                  input.brief,
+                  i,
+                  evaluator.success.forPurpose(`prototype v${i + 1}`),
+                ),
               catch: (e) => String(e instanceof Error ? e.message : e).slice(0, 200),
             }).pipe(Effect.result),
           { concurrency: CONCURRENCY },

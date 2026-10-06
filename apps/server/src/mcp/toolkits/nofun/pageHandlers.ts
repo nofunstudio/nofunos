@@ -33,7 +33,7 @@ import {
   type Variant,
 } from "../../../nofun/pages/jev.ts";
 import { playbookFor } from "../../../nofun/playbook.ts";
-import { parseFlatSpec, type FlatSpec } from "../../../nofun/pages/spec.ts";
+import { childrenOf, parseFlatSpec, type FlatSpec } from "../../../nofun/pages/spec.ts";
 import * as McpInvocationContext from "../../McpInvocationContext.ts";
 import { readMutationCaller } from "../../threadAccess.ts";
 import {
@@ -247,19 +247,29 @@ const handlers = {
         Array.from({ length: count }, (_, i) => i),
         (i) =>
           Effect.tryPromise({
-            try: () => {
-              purpose.value = `compose ${pool.brand.id} v${i + 1}`;
-              return composeVariant(pool, input.brief, i, evaluator.evaluate);
-            },
+            try: () =>
+              composeVariant(
+                pool,
+                input.brief,
+                i,
+                evaluator.forPurpose(`compose ${pool.brand.id} v${i + 1}`),
+              ),
             catch: (e) => String(e instanceof Error ? e.message : e).slice(0, 200),
           }).pipe(Effect.result),
         { concurrency: CONCURRENCY },
       );
       const pages: Variant[] = [];
       let firstError: string | undefined;
+      // Jev can pick the same blocks twice; two identical cards are noise, so keep the first.
+      const seenPages = new Set<string>();
       for (const r of composed) {
         if (r._tag === "Failure") firstError ??= r.failure;
-        else if (r.success) pages.push(r.success);
+        else if (r.success) {
+          const key = JSON.stringify(childrenOf(r.success.spec).map((e) => [e.type, e.props]));
+          if (seenPages.has(key)) continue;
+          seenPages.add(key);
+          pages.push(r.success);
+        }
       }
       if (pages.length === 0) {
         return yield* new OrchestratorMcpFailure({

@@ -431,7 +431,8 @@ export async function searchComponents(input: {
       entry.mainComponent && entry.exports.includes(entry.mainComponent)
         ? [entry.mainComponent, ...entry.exports.filter((name) => name !== entry.mainComponent)]
         : entry.exports;
-    const parts = named.filter((name) => /^[A-Z]/.test(name)).slice(0, 6);
+    // Every part: a block's plot or legend is often past the sixth export, and an agent cannot import what it never sees.
+    const parts = named.filter((name) => /^[A-Z]/.test(name)).slice(0, 16);
     return {
       name: entry.name,
       kind: entry.kind,
