@@ -90,6 +90,9 @@ import * as SecretRequests from "../secrets/SecretRequests.ts";
 
 const DEFAULT_WAIT_TIMEOUT_MS = 10 * 60 * 1_000;
 const MAX_WAIT_TIMEOUT_MS = 60 * 60 * 1_000;
+// delegate_task waits stay under typical MCP client tool-call timeouts (about
+// 5 minutes in Codex): a client that times out first never sees the taskId.
+const DEFAULT_DELEGATE_WAIT_TIMEOUT_MS = 2 * 60 * 1_000;
 // Events that can make a delegated task terminal: the parent's task record,
 // and the child's runs, nested tasks, and pending provider background work.
 const TASK_WAKE_EVENTS = [
@@ -509,6 +512,20 @@ export function resolveInteractionMode(
         ),
       )
     : Effect.succeed(resolved);
+}
+
+/** Non-cryptographic 53-bit content fingerprint (cyrb53) for retry-dedupe keys. */
+function fingerprint(text: string): string {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
 }
 
 function stablePart(value: string): string {
@@ -1823,7 +1840,27 @@ const make = Effect.gen(function* () {
     delegateTask: (callerScope, input) =>
       Effect.gen(function* () {
         const { scope, parent } = yield* loadThreadCaller(callerScope, "delegate_task");
-        const key = yield* requestKey(input.clientRequestId);
+        // Without a clientRequestId, a retry after a client-side timeout would
+        // mint a fresh key and start a duplicate child. Derive the key from the
+        // request content within the parent's current run so an identical retry
+        // finds the existing task.
+        const key =
+          input.clientRequestId !== undefined
+            ? input.clientRequestId
+            : yield* Effect.sync(() => {
+                const activeRun = parent.runs
+                  .filter(ThreadManagementService.isActiveRun)
+                  .toSorted((left, right) => right.ordinal - left.ordinal)[0];
+                return `auto-${fingerprint(
+                  [
+                    activeRun?.id ?? "",
+                    input.target?.providerInstanceId ?? "",
+                    input.target?.model ?? "",
+                    input.title ?? "",
+                    taskPrompt(input),
+                  ].join("\u0000"),
+                )}`;
+              });
         const commandId = stableCommandId({
           scope,
           requestKey: key,
@@ -1911,7 +1948,7 @@ const make = Effect.gen(function* () {
         }
         const timeoutMs = Math.min(
           MAX_WAIT_TIMEOUT_MS,
-          Math.max(1, input.timeoutMs ?? DEFAULT_WAIT_TIMEOUT_MS),
+          Math.max(1, input.timeoutMs ?? DEFAULT_DELEGATE_WAIT_TIMEOUT_MS),
         );
         const waited = yield* waitForTask(scope, taskId, timeoutMs);
         if (Option.isSome(waited)) {

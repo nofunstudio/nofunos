@@ -187,9 +187,12 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
   const allModelNames = selectedEntries
     ? selectedEntries.map((selection) => selection.label).join(", ") || "Choose models"
     : undefined;
+  // Several instances of one provider (or an accented custom instance) share a
+  // glyph, so name the account in the trigger.
+  const accountPrefix = showInstanceBadge && activeEntry ? `${activeEntry.displayName} · ` : "";
   const triggerTooltipContent = shortcutLabel
-    ? `${props.triggerLabel ?? allModelNames ?? triggerLabel} · ${shortcutLabel}`
-    : (props.triggerLabel ?? allModelNames ?? triggerLabel);
+    ? `${props.triggerLabel ?? allModelNames ?? accountPrefix + triggerLabel} · ${shortcutLabel}`
+    : (props.triggerLabel ?? allModelNames ?? accountPrefix + triggerLabel);
 
   return (
     <Popover
@@ -270,7 +273,7 @@ export const ProviderModelPicker = memo(function ProviderModelPicker(props: {
                 />
               }
             >
-              {props.triggerLabel ?? multipleLabel ?? triggerTitle}
+              {props.triggerLabel ?? multipleLabel ?? accountPrefix + triggerTitle}
             </TooltipTrigger>
             <TooltipPopup side="top">{triggerTooltipContent}</TooltipPopup>
           </Tooltip>

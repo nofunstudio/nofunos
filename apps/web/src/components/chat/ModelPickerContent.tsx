@@ -962,6 +962,19 @@ export const ModelPickerContent = memo(function ModelPickerContent(props: {
               onTouchStart={(e) => e.stopPropagation()}
             />
 
+            {/* Name the account behind the sidebar icon when several instances exist. */}
+            {!isSearching &&
+            selectedInstanceId !== "favorites" &&
+            sidebarInstanceEntries.length > 1 ? (
+              <div
+                className="truncate px-3 pt-1.5 pb-1 text-xs font-medium text-muted-foreground"
+                data-model-picker-instance-label="true"
+              >
+                {instanceEntries.find((entry) => entry.instanceId === selectedInstanceId)
+                  ?.displayName ?? ""}
+              </div>
+            ) : null}
+
             {/* Model list */}
             <div
               className="relative min-h-0 overflow-hidden pr-px"
