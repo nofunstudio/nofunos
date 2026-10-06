@@ -41,14 +41,14 @@ const WelcomeRoute = WelcomeRouteImport.update({
   path: '/welcome',
   getParentRoute: () => rootRouteImport,
 } as any)
-const SideQuestRoute = SideQuestRouteImport.update({
-  id: '/side-quest',
-  path: '/side-quest',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const UsageRoute = UsageRouteImport.update({
   id: '/usage',
   path: '/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SideQuestRoute = SideQuestRouteImport.update({
+  id: '/side-quest',
+  path: '/side-quest',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -173,8 +173,8 @@ export interface FileRoutesByFullPath {
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
-  '/usage': typeof UsageRoute
   '/side-quest': typeof SideQuestRoute
+  '/usage': typeof UsageRoute
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
@@ -199,8 +199,8 @@ export interface FileRoutesByTo {
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
-  '/usage': typeof UsageRoute
   '/side-quest': typeof SideQuestRoute
+  '/usage': typeof UsageRoute
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
@@ -228,8 +228,8 @@ export interface FileRoutesById {
   '/connect': typeof ConnectRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
-  '/usage': typeof UsageRoute
   '/side-quest': typeof SideQuestRoute
+  '/usage': typeof UsageRoute
   '/welcome': typeof WelcomeRoute
   '/_chat/pull-requests': typeof ChatPullRequestsRoute
   '/projects/$projectKey': typeof ProjectsProjectKeyRoute
@@ -258,8 +258,8 @@ export interface FileRouteTypes {
     | '/connect'
     | '/pair'
     | '/settings'
-    | '/usage'
     | '/side-quest'
+    | '/usage'
     | '/welcome'
     | '/pull-requests'
     | '/projects/$projectKey'
@@ -284,8 +284,8 @@ export interface FileRouteTypes {
     | '/connect'
     | '/pair'
     | '/settings'
-    | '/usage'
     | '/side-quest'
+    | '/usage'
     | '/welcome'
     | '/pull-requests'
     | '/projects/$projectKey'
@@ -312,8 +312,8 @@ export interface FileRouteTypes {
     | '/connect'
     | '/pair'
     | '/settings'
-    | '/usage'
     | '/side-quest'
+    | '/usage'
     | '/welcome'
     | '/_chat/pull-requests'
     | '/projects/$projectKey'
@@ -341,8 +341,8 @@ export interface RootRouteChildren {
   ConnectRoute: typeof ConnectRoute
   PairRoute: typeof PairRoute
   SettingsRoute: typeof SettingsRouteWithChildren
-  UsageRoute: typeof UsageRoute
   SideQuestRoute: typeof SideQuestRoute
+  UsageRoute: typeof UsageRoute
   WelcomeRoute: typeof WelcomeRoute
   ProjectsProjectKeyRoute: typeof ProjectsProjectKeyRoute
 }
@@ -356,18 +356,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof WelcomeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/side-quest': {
-      id: '/side-quest'
-      path: '/side-quest'
-      fullPath: '/side-quest'
-      preLoaderRoute: typeof SideQuestRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/usage': {
       id: '/usage'
       path: '/usage'
       fullPath: '/usage'
       preLoaderRoute: typeof UsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/side-quest': {
+      id: '/side-quest'
+      path: '/side-quest'
+      fullPath: '/side-quest'
+      preLoaderRoute: typeof SideQuestRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -593,8 +593,8 @@ const rootRouteChildren: RootRouteChildren = {
   ConnectRoute: ConnectRoute,
   PairRoute: PairRoute,
   SettingsRoute: SettingsRouteWithChildren,
-  UsageRoute: UsageRoute,
   SideQuestRoute: SideQuestRoute,
+  UsageRoute: UsageRoute,
   WelcomeRoute: WelcomeRoute,
   ProjectsProjectKeyRoute: ProjectsProjectKeyRoute,
 }
