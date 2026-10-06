@@ -70,11 +70,13 @@ import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import * as ProviderAdapterRegistry from "../orchestration-v2/ProviderAdapterRegistry.ts";
+import * as IdAllocator from "../orchestration-v2/IdAllocator.ts";
 import {
   subagentResultForRun,
   delegatedTaskProgress,
 } from "../orchestration-v2/SubagentProjection.ts";
 import * as ThreadManagementService from "../orchestration-v2/ThreadManagementService.ts";
+import * as GitWorkflowService from "../git/GitWorkflowService.ts";
 import * as ProjectService from "../project/ProjectService.ts";
 import * as ProviderRegistry from "../provider/ProviderRegistry.ts";
 import * as ScheduledTaskService from "../scheduledTasks/ScheduledTaskService.ts";
@@ -829,6 +831,105 @@ const make = Effect.gen(function* () {
         )
       : Effect.succeed(project.defaultModelSelection);
   const secretRequests = yield* SecretRequests.SecretRequests;
+
+  const prepareDelegatedWorkspace = (
+    scope: McpThreadInvocationScope,
+    parent: Pick<OrchestrationV2ThreadProjection, "thread" | "subagents">,
+    commandId: CommandId,
+    workspace: NonNullable<OrchestratorMcpDelegateTaskInput["workspace"]>,
+  ) =>
+    Effect.gen(function* () {
+      if (workspace.strategy !== "worktree") return undefined;
+      if (!scope.capabilities.has("worktree")) {
+        return yield* failure(
+          "capability_denied",
+          "This MCP credential cannot prepare delegated worktrees.",
+        );
+      }
+
+      const gitService = yield* Effect.serviceOption(GitWorkflowService.GitWorkflowService);
+      if (Option.isNone(gitService)) {
+        return yield* failure(
+          "provider_unavailable",
+          "This server cannot prepare delegated worktrees.",
+        );
+      }
+      const git = gitService.value;
+
+      const project = yield* requireProject(parent.thread.projectId);
+      let branch = workspace.branch;
+      if (branch === undefined) {
+        const digest = yield* crypto
+          .digest("SHA-256", new TextEncoder().encode(commandId))
+          .pipe(
+            Effect.mapError((error) =>
+              failure("orchestration_error", `Unable to name delegated worktree: ${error.message}`),
+            ),
+          );
+        const stableSuffix = Array.from(digest.subarray(0, 8), (byte) =>
+          byte.toString(16).padStart(2, "0"),
+        ).join("");
+        branch = `t3/delegate-${stableSuffix}`;
+      }
+      const refs = yield* git
+        .listRefs({
+          cwd: project.workspaceRoot,
+          query: branch,
+          refKind: "local",
+          refresh: true,
+          limit: 100,
+        })
+        .pipe(
+          Effect.mapError((error) =>
+            failure("orchestration_error", `Unable to inspect worktrees: ${error.message}`),
+          ),
+        );
+      const matchingRef = refs.refs.find((ref) => !ref.isRemote && ref.name === branch);
+      // A generated branch is tied to the stable request command id, so finding
+      // its prior checkout makes a retry after worktree creation idempotent.
+      if (
+        workspace.branch === undefined &&
+        matchingRef !== undefined &&
+        matchingRef.worktreePath !== null
+      ) {
+        return { branch, worktreePath: matchingRef.worktreePath };
+      }
+
+      const current = yield* git
+        .localStatus({ cwd: project.workspaceRoot })
+        .pipe(
+          Effect.mapError((error) =>
+            failure("orchestration_error", `Unable to resolve the parent branch: ${error.message}`),
+          ),
+        );
+      const baseRef = parent.thread.branch ?? current.refName;
+      if (baseRef === null) {
+        return yield* failure(
+          "invalid_request",
+          "A delegated worktree needs a named parent branch. Attach this thread to a branch before requesting an isolated workspace.",
+        );
+      }
+
+      const worktree = yield* git
+        .createWorktree({
+          cwd: project.workspaceRoot,
+          refName: workspace.branch === undefined && matchingRef !== undefined ? branch : baseRef,
+          ...(workspace.branch !== undefined || matchingRef === undefined
+            ? { newRefName: branch }
+            : {}),
+          baseRefName: baseRef,
+          path: null,
+        })
+        .pipe(
+          Effect.mapError((error) =>
+            failure(
+              "orchestration_error",
+              `Unable to prepare delegated worktree: ${error.message}`,
+            ),
+          ),
+        );
+      return { branch: worktree.worktree.refName, worktreePath: worktree.worktree.path };
+    });
 
   const requireCapability = (scope: McpInvocationScope) =>
     scope.capabilities.has("orchestration")
@@ -1676,6 +1777,7 @@ const make = Effect.gen(function* () {
         const { parent, limits } = yield* loadCaller(scope);
         const providers = yield* loadProviders;
         const orchestrationCapableInstanceIds = yield* loadOrchestrationCapableInstanceIds();
+        const worktreeService = yield* Effect.serviceOption(GitWorkflowService.GitWorkflowService);
         return {
           parentThreadId: parent?.thread.id ?? null,
           inheritedProviderInstanceId: parent?.thread.modelSelection.instanceId ?? null,
@@ -1712,6 +1814,8 @@ const make = Effect.gen(function* () {
             threadManagement: true,
             incrementalThreadRead: true,
             scheduledTasks: true,
+            delegatedTaskWorktrees:
+              scope.capabilities.has("worktree") && Option.isSome(worktreeService),
             maxBatchThreads: 20,
           },
         };
@@ -1719,74 +1823,88 @@ const make = Effect.gen(function* () {
     delegateTask: (callerScope, input) =>
       Effect.gen(function* () {
         const { scope, parent } = yield* loadThreadCaller(callerScope, "delegate_task");
-        const parentRun = parent.runs
-          .filter(ThreadManagementService.isActiveRun)
-          .toSorted((left, right) => right.ordinal - left.ordinal)[0];
-        if (
-          parentRun === undefined ||
-          parentRun.rootNodeId === null ||
-          parentRun.providerInstanceId !== scope.thread.providerInstanceId
-        ) {
-          return yield* failure(
-            "parent_not_active",
-            "Delegated tasks require an active run owned by this MCP provider session.",
-          );
-        }
-        const providers = yield* loadProviders;
-        const target = yield* resolveTargetRechecking({
-          parent,
-          target: input.target,
-          providers,
-        });
-        const runtimeMode = yield* resolveRuntimeMode(parent.thread.runtimeMode, input.runtimeMode);
-        const interactionMode = yield* resolveInteractionMode(
-          parent.thread.interactionMode,
-          input.interactionMode,
-        );
         const key = yield* requestKey(input.clientRequestId);
         const commandId = stableCommandId({
           scope,
           requestKey: key,
           operation: "delegate-task",
         });
-        const result = yield* threadManagement
-          .dispatch({
-            type: "delegated_task.request",
-            createdBy: "agent",
-            creationSource: "mcp",
-            commandId,
-            parentThreadId: scope.thread.threadId,
-            parentRunId: parentRun.id,
-            parentNodeId: parentRun.rootNodeId,
-            task: taskPrompt(input),
-            ...(input.title === undefined ? {} : { title: input.title }),
-            modelSelection: target.modelSelection,
-            runtimeMode,
-            interactionMode,
-            // Async delegations wake the parent on every child terminal; wait
-            // delegations deliver through the blocking tool call, so a wake is
-            // only needed if the parent settled first (timeout, disconnect).
-            completionWake: input.mode === "wait" ? "settled_only" : "always",
-          })
-          .pipe(
-            Effect.mapError((error) =>
-              failure(
-                "orchestration_error",
-                `Unable to create delegated task: ${errorMessage(error)}`,
-              ),
-            ),
-          );
-        const taskEvent = result.storedEvents.find(
-          (stored) =>
-            stored.event.type === "subagent.updated" && stored.event.payload.origin === "app_owned",
+        const taskId = IdAllocator.delegatedTaskNodeId({ commandId });
+        const existingTask = parent.subagents.find(
+          (task) => task.id === taskId && task.origin === "app_owned",
         );
-        if (taskEvent?.event.type !== "subagent.updated") {
-          return yield* failure(
-            "orchestration_error",
-            "Delegated task command did not produce a task projection.",
+        if (existingTask === undefined) {
+          const parentRun = parent.runs
+            .filter(ThreadManagementService.isActiveRun)
+            .toSorted((left, right) => right.ordinal - left.ordinal)[0];
+          if (
+            parentRun === undefined ||
+            parentRun.rootNodeId === null ||
+            parentRun.providerInstanceId !== scope.thread.providerInstanceId
+          ) {
+            return yield* failure(
+              "parent_not_active",
+              "Delegated tasks require an active run owned by this MCP provider session.",
+            );
+          }
+          const providers = yield* loadProviders;
+          const target = yield* resolveTargetRechecking({
+            parent,
+            target: input.target,
+            providers,
+          });
+          const runtimeMode = yield* resolveRuntimeMode(
+            parent.thread.runtimeMode,
+            input.runtimeMode,
           );
+          const interactionMode = yield* resolveInteractionMode(
+            parent.thread.interactionMode,
+            input.interactionMode,
+          );
+          const workspaceBinding =
+            input.workspace === undefined
+              ? undefined
+              : yield* prepareDelegatedWorkspace(scope, parent, commandId, input.workspace);
+          const result = yield* threadManagement
+            .dispatch({
+              type: "delegated_task.request",
+              createdBy: "agent",
+              creationSource: "mcp",
+              commandId,
+              parentThreadId: scope.thread.threadId,
+              parentRunId: parentRun.id,
+              parentNodeId: parentRun.rootNodeId,
+              task: taskPrompt(input),
+              ...(input.title === undefined ? {} : { title: input.title }),
+              modelSelection: target.modelSelection,
+              runtimeMode,
+              interactionMode,
+              ...(workspaceBinding === undefined ? {} : { workspaceBinding }),
+              // Async delegations wake the parent on every child terminal; wait
+              // delegations deliver through the blocking tool call, so a wake is
+              // only needed if the parent settled first (timeout, disconnect).
+              completionWake: input.mode === "wait" ? "settled_only" : "always",
+            })
+            .pipe(
+              Effect.mapError((error) =>
+                failure(
+                  "orchestration_error",
+                  `Unable to create delegated task: ${errorMessage(error)}`,
+                ),
+              ),
+            );
+          const taskEvent = result.storedEvents.find(
+            (stored) =>
+              stored.event.type === "subagent.updated" &&
+              stored.event.payload.origin === "app_owned",
+          );
+          if (taskEvent?.event.type !== "subagent.updated") {
+            return yield* failure(
+              "orchestration_error",
+              "Delegated task command did not produce a task projection.",
+            );
+          }
         }
-        const taskId = taskEvent.event.payload.id;
 
         if (input.mode !== "wait") {
           return yield* readTask(scope, taskId, false, true);
