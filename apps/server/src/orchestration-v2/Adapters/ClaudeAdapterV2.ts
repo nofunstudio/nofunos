@@ -861,16 +861,14 @@ export function makeClaudeQueryOptions(input: {
           ...(typeof querySettings === "object" && querySettings !== null ? querySettings : {}),
           autoCompactWindow: Number(input.settings.autoCompactWindow),
         } as ClaudeSdkSettings);
-  // CATCHES artifacts are hosted Claude artifacts; turn the SDK's Artifact tool on for that persona.
-  const effectiveQuerySettings =
-    readNofunPersonaScope()?.info.id === "catches"
-      ? ({
-          ...(typeof autoCompactQuerySettings === "object" && autoCompactQuerySettings !== null
-            ? autoCompactQuerySettings
-            : {}),
-          enableArtifact: true,
-        } as ClaudeSdkSettings)
-      : autoCompactQuerySettings;
+  // CATCHES artifacts are hosted Claude artifacts; No Fun servers use No Fun artifacts, so the SDK's
+  // Artifact tool is on only for the CATCHES persona.
+  const effectiveQuerySettings = {
+    ...(typeof autoCompactQuerySettings === "object" && autoCompactQuerySettings !== null
+      ? autoCompactQuerySettings
+      : {}),
+    enableArtifact: readNofunPersonaScope()?.info.id === "catches",
+  } as ClaudeSdkSettings;
   const options: ClaudeAgentSdkQueryOptions = {
     model: compiledSelection.apiModelId,
     tools: claudeAgentSdkQueryToolsForSdk(selectedTools),
