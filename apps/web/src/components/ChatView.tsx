@@ -257,6 +257,7 @@ import { BrowserSettingsReadError, openUrlInPreview } from "../browser/openFileI
 import { resolveDiscoveredServerUrl } from "../browser/browserTargetResolver";
 import { previewRuntimeTabId } from "../browser/previewRuntimeTabId";
 import { addBrowserSurface } from "./preview/addBrowserSurface";
+import { nofunProfileHomeUrl } from "~/nofun/PersonaChip";
 import { closePreviewSession } from "./preview/closePreviewSession";
 import { ThreadPreviewMiniPlayer } from "./preview/ThreadPreviewMiniPlayer";
 import { usePreviewSession } from "./preview/usePreviewSession";
@@ -5257,6 +5258,7 @@ export default function ChatView(props: ChatViewProps) {
         threadRef: activeThreadRef,
         openPreview,
         ...(profileId === undefined ? {} : { profileId }),
+        url: nofunProfileHomeUrl(profileId),
       }).then((result) => {
         if (result._tag !== "Failure" || isAtomCommandInterrupted(result)) return;
         const error = squashAtomCommandFailure(result);

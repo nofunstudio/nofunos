@@ -15,6 +15,7 @@
  */
 import * as Schema from "effect/Schema";
 import { TrimmedNonEmptyString } from "./baseSchemas.ts";
+import { NOFUN_BROWSER_PROFILES } from "./nofunPersona.ts";
 
 export const BROWSER_PROFILE_NAME_MAX_LENGTH = 48;
 export const BROWSER_PROFILE_MAX_COUNT = 24;
@@ -58,6 +59,7 @@ export const INCOGNITO_BROWSER_PROFILE_ID: BrowserProfileId = "incognito";
 export const BUILT_IN_BROWSER_PROFILES: ReadonlyArray<BrowserProfile> = [
   { id: DEFAULT_BROWSER_PROFILE_ID, name: "Default", kind: "persistent" },
   { id: INCOGNITO_BROWSER_PROFILE_ID, name: "Incognito", kind: "incognito" },
+  ...NOFUN_BROWSER_PROFILES,
 ];
 
 export function isBuiltInBrowserProfileId(id: string): boolean {
