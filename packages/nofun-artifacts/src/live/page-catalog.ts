@@ -16,7 +16,20 @@ export interface PageCatalogModule {
   readonly catalog: {
     validate(spec: unknown): { success: boolean; error?: { issues: ReadonlyArray<ZodIssue> } };
     prompt(options?: Record<string, unknown>): string;
-    readonly data?: { components?: Record<string, { description?: string }> };
+    readonly data?: {
+      components?: Record<
+        string,
+        {
+          description?: string;
+          props?: {
+            safeParse(value: unknown): {
+              success: boolean;
+              error?: { issues: ReadonlyArray<ZodIssue> };
+            };
+          };
+        }
+      >;
+    };
   };
   validateSpec(spec: unknown): {
     valid: boolean;
@@ -55,6 +68,25 @@ export async function pageSpecIssues(spec: unknown): Promise<string[]> {
   if (!result.success) {
     for (const issue of result.error?.issues ?? []) {
       issues.push(`${issue.path.map(String).join(".") || "spec"}: ${issue.message}`);
+    }
+  }
+  // The catalog schema types `props` loosely; check each element against its component's own schema.
+  const components = mod.catalog.data?.components ?? {};
+  const elements = (
+    spec as { elements?: Record<string, { type?: unknown; props?: unknown }> } | null
+  )?.elements;
+  for (const [id, element] of Object.entries(elements ?? {})) {
+    const type = typeof element?.type === "string" ? element.type : "";
+    const component = components[type];
+    if (!component) {
+      issues.push(
+        `elements.${id}.type: unknown component "${type}". Use one of ${Object.keys(components).join(", ")}.`,
+      );
+      continue;
+    }
+    const parsed = component.props?.safeParse(element.props ?? {});
+    for (const issue of parsed && !parsed.success ? (parsed.error?.issues ?? []) : []) {
+      issues.push(`elements.${id}.props.${issue.path.map(String).join(".")}: ${issue.message}`);
     }
   }
   if (issues.length === 0) {
