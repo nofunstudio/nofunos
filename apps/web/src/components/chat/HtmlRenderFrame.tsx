@@ -8,6 +8,8 @@ import {
 import { Maximize2Icon } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { PinHtmlRenderButton } from "../../nofun/shelf/PinHtmlRenderButton";
+
 import { useAssetUrlRefresh, useAssetUrlState } from "~/assets/assetUrls";
 import type { ChatFileAttachment } from "~/types";
 
@@ -27,7 +29,10 @@ const MIN_URL_LIFE_MS = 5 * 60_000;
 export function HtmlRenderFrame(props: {
   readonly environmentId: EnvironmentId;
   readonly htmlRender: HtmlRenderReference;
-  readonly onOpen: (attachment: ChatFileAttachment) => void;
+  /** Absent where there is no panel to open into, such as the Side Quest shelf. */
+  readonly onOpen?: (attachment: ChatFileAttachment) => void;
+  /** Thread the render belongs to; shown pins record it. Absent hides the pin button. */
+  readonly pinThreadId?: string;
 }) {
   const { attachmentId, title } = props.htmlRender;
   // The frame takes the page's measured height at its own width, read before
@@ -101,32 +106,41 @@ export function HtmlRenderFrame(props: {
             className="block size-full"
             onContentHeight={setContentHeight}
           />
-          <div className="absolute end-2 top-2 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/html-render:opacity-100 pointer-coarse:opacity-100">
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <Button
-                    aria-label="Open in panel"
-                    size="icon-xs"
-                    variant="glass"
-                    onClick={() =>
-                      props.onOpen({
-                        type: "file",
-                        id: attachmentId,
-                        name: fileName,
-                        mimeType: "text/html",
-                        // Unknown here; the preview leaves it out.
-                        sizeBytes: 0,
-                        htmlRender: true,
-                      })
-                    }
-                  />
-                }
-              >
-                <Maximize2Icon className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup side="left">Open in panel</TooltipPopup>
-            </Tooltip>
+          <div className="absolute end-2 top-2 flex gap-1 opacity-0 transition-opacity duration-150 focus-within:opacity-100 group-hover/html-render:opacity-100 pointer-coarse:opacity-100">
+            {props.pinThreadId === undefined ? null : (
+              <PinHtmlRenderButton
+                environmentId={props.environmentId}
+                threadId={props.pinThreadId}
+                htmlRender={props.htmlRender}
+              />
+            )}
+            {props.onOpen === undefined ? null : (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      aria-label="Open in panel"
+                      size="icon-xs"
+                      variant="glass"
+                      onClick={() =>
+                        props.onOpen?.({
+                          type: "file",
+                          id: attachmentId,
+                          name: fileName,
+                          mimeType: "text/html",
+                          // Unknown here; the preview leaves it out.
+                          sizeBytes: 0,
+                          htmlRender: true,
+                        })
+                      }
+                    />
+                  }
+                >
+                  <Maximize2Icon className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipPopup side="left">Open in panel</TooltipPopup>
+              </Tooltip>
+            )}
           </div>
         </>
       ) : failed ? (
