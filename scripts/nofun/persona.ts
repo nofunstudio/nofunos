@@ -1,8 +1,12 @@
+// @effect-diagnostics nodeBuiltinImport:off globalConsole:off globalFetch:off globalTimers:off - Host-side launcher script, not server code.
 /**
  * Start a T3 server for one No Fun persona.
  *
  *   node scripts/nofun/persona.ts start nofun|catches [--port N] [--dry-run] [-- <extra server args>]
  *   node scripts/nofun/persona.ts show nofun|catches
+ *
+ * Prints `persona-ready <id> (<label>) <url>` once the HTTP port answers.
+ * NOFUN_PERSONAS_CONFIG overrides the config path (for scratch runs).
  *
  * Reads ~/.nofun-t3/personas.json (see scripts/nofun/personas.example.json),
  * gives the server its own --base-dir, seeds provider instances for that home
@@ -49,7 +53,10 @@ const expand = (value: string): string =>
   value === "~" || value.startsWith("~/") ? path.join(os.homedir(), value.slice(1)) : value;
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..");
-const configPath = path.join(os.homedir(), ".nofun-t3", "personas.json");
+// NOFUN_PERSONAS_CONFIG points a scratch/test run at a copy of the config.
+const configPath = process.env.NOFUN_PERSONAS_CONFIG
+  ? path.resolve(expand(process.env.NOFUN_PERSONAS_CONFIG))
+  : path.join(os.homedir(), ".nofun-t3", "personas.json");
 
 function fail(message: string): never {
   console.error(`persona: ${message}`);
@@ -88,6 +95,20 @@ function seedSettings(homeDir: string, spec: PersonaSpec): void {
     providers[legacyKey] = { ...providers[legacyKey], enabled: false };
   }
   fs.writeFileSync(settingsPath, `${JSON.stringify(settings, null, 2)}\n`);
+}
+
+/** Poll the HTTP port and print one stable line scripts can wait for. */
+async function announceWhenReady(personaId: string, label: string, port: number): Promise<void> {
+  for (let attempt = 0; attempt < 240; attempt += 1) {
+    try {
+      await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1000) });
+      console.log(`persona-ready ${personaId} (${label}) http://127.0.0.1:${port}`);
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+  }
+  console.error(`persona ${personaId}: server did not answer on port ${port} within 2 minutes`);
 }
 
 function start(personaId: string, args: string[]): void {
@@ -138,6 +159,7 @@ function start(personaId: string, args: string[]): void {
   }
   seedSettings(homeDir, spec);
   const child = spawn(command[0]!, command.slice(1), { env, stdio: "inherit" });
+  void announceWhenReady(personaId, spec.label, port);
   const forward = (signal: NodeJS.Signals) => child.kill(signal);
   process.on("SIGINT", forward);
   process.on("SIGTERM", forward);
