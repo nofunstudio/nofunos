@@ -1,0 +1,135 @@
+/*
+ * The artifact page's own frame. Compiled after the No Fun snapshots, so it only adds what a
+ * standalone page needs: font stacks (no font files ship with artifacts), the page surface for a
+ * pinned brand, and the follow-T3 mapping that reads the host's injected theme variables.
+ */
+
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --font-geist-sans:
+    "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-geist-mono:
+    "Geist Mono", ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+  /* Kobra's badge tints (app/globals.css :root and .dark). Brand sheets re-point them. */
+  --badge-blue-bg: oklch(0.62 0.19 258 / 0.12);
+  --badge-blue-fg: oklch(0.48 0.17 258);
+  --badge-green-bg: oklch(0.62 0.16 152 / 0.12);
+  --badge-green-fg: oklch(0.48 0.125 152);
+  --badge-amber-bg: oklch(0.62 0.15 75 / 0.14);
+  --badge-amber-fg: oklch(0.5 0.115 75);
+}
+.dark {
+  --badge-blue-bg: oklch(0.62 0.19 258 / 0.2);
+  --badge-blue-fg: oklch(0.72 0.145 258);
+  --badge-green-bg: oklch(0.62 0.16 152 / 0.2);
+  --badge-green-fg: oklch(0.72 0.16 152);
+  --badge-amber-bg: oklch(0.62 0.15 75 / 0.2);
+  --badge-amber-fg: oklch(0.78 0.135 75);
+}
+
+/* T3's base sheet sets a 14px root; No Fun sizes assume 16px rem. */
+html {
+  font-size: 16px;
+}
+body {
+  margin: 0;
+}
+
+/* Kobra's base layer (app/globals.css @layer base): hairlines and focus rings use the theme tokens. */
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+    outline-color: color-mix(in oklab, var(--ring) 50%, transparent);
+  }
+}
+
+/* A pinned brand paints its own canvas, so the page is its own rounded surface inside the reply. */
+body[data-brand] {
+  padding: 16px;
+  border-radius: 14px;
+}
+
+/*
+ * Tokens Kobra keeps on :root in app/globals.css (charts, status hues, ring, destructive) rather than
+ * in every brand sheet. Bridged to the brand's --nf-* values at zero extra specificity, so a brand
+ * sheet that declares them still wins.
+ */
+:where(body)[data-brand] {
+  --chart-1: var(--nf-chart-1);
+  --chart-2: var(--nf-chart-2);
+  --chart-3: var(--nf-chart-3);
+  --chart-4: var(--nf-chart-4);
+  --chart-5: var(--nf-chart-5);
+  --success: var(--nf-success);
+  --warning: var(--nf-warning);
+  --error: var(--nf-danger);
+  --info: oklch(0.5 0.17 255);
+  --destructive: var(--nf-danger);
+  --destructive-foreground: var(--nf-danger-foreground);
+  --accent: var(--nf-default);
+  --accent-foreground: var(--nf-default-foreground);
+  --ring: var(--nf-focus);
+}
+:where(body)[data-brand].dark {
+  --info: oklch(0.704 0.15 255);
+}
+
+/*
+ * Follow T3: no brand scope. T3 injects --background, --foreground, --card, --muted, --border,
+ * --primary, --chart-1..6, --success, --warning, --info and --destructive on :root; the No Fun
+ * semantic tokens are pointed at them so every component follows the user's app theme.
+ */
+body[data-nf-theme="t3"] {
+  --nf-canvas: var(--background);
+  --nf-ink: var(--foreground);
+  --nf-ink-muted: var(--muted-foreground);
+  --nf-rule: var(--border);
+  --nf-surface: var(--muted);
+  --nf-surface-product: var(--card);
+  --nf-accent: var(--accent);
+  --nf-accent-foreground: var(--accent-foreground);
+  --nf-primary: var(--primary);
+  --nf-primary-foreground: var(--primary-foreground);
+  --nf-success: var(--success);
+  --nf-warning: var(--warning);
+  --nf-danger: var(--destructive);
+  --nf-display: var(--font-sans);
+  --nf-body: var(--font-sans);
+  --nf-mono: var(--font-mono);
+  --font-geist-sans: var(--font-sans);
+  --font-geist-mono: var(--font-mono);
+  --error: var(--destructive);
+}
+/* Kobra lifts its gray chart ramp under .dark; following T3 keeps T3's own chart colors instead. */
+body[data-nf-theme="t3"].dark {
+  --chart-1: inherit;
+  --chart-2: inherit;
+  --chart-3: inherit;
+  --chart-4: inherit;
+  --chart-5: inherit;
+}
+
+/* Kobra's ring transition (app/globals.css @utility transition-ring), with its token values inlined. */
+@utility transition-ring {
+  transition-property:
+    color, background-color, border-color, box-shadow, outline-color, outline-offset;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  @media (prefers-reduced-motion: reduce) {
+    transition-duration: 0ms;
+  }
+}
+
+/* Kobra's field focus (app/globals.css @utility focus-field), with its token values inlined. */
+@utility focus-field {
+  outline: none;
+  transition-property: color, background-color, border-color, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+  &:focus-within {
+    border-color: var(--field-focus-color, var(--ring));
+    box-shadow: inset 0 0 0 var(--field-focus-width, 0.5px) var(--field-focus-color, var(--ring));
+  }
+}

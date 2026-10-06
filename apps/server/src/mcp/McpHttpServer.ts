@@ -55,6 +55,7 @@ import {
 } from "./toolkits/device/tools.ts";
 import * as HtmlHandlers from "./toolkits/html/handlers.ts";
 import { HtmlPreviewTool, HtmlPreviewToolkit, HtmlRenderToolkit } from "./toolkits/html/tools.ts";
+import * as NofunArtifactHandlers from "./toolkits/nofun/handlers.ts";
 
 const unauthorized = HttpServerResponse.jsonUnsafe(
   {
@@ -573,7 +574,7 @@ const imageToolFailure =
  * result carries a `screenshot` field are registered by hand so the PNG goes
  * out as an image block and the rest of the payload as JSON metadata.
  */
-const registerImageTool = <T extends Tool.Any, E, R>(
+export const registerImageTool = <T extends Tool.Any, E, R>(
   tool: T,
   handle: (payload: Tool.Parameters<T>) => Effect.Effect<{ readonly encodedResult: unknown }, E, R>,
   provide: (
@@ -774,4 +775,5 @@ export const layer = Layer.mergeAll(
   layerPullRequestsToolkit,
   layerDeviceToolkit,
   layerHtmlToolkit,
+  NofunArtifactHandlers.makeLayer(registerImageTool),
 ).pipe(Layer.provideMerge(layerMcpTransport));
