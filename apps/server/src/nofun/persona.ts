@@ -8,7 +8,6 @@
  */
 import type { NofunPersonaInfo } from "@t3tools/contracts";
 import * as NodeOS from "node:os";
-import * as NodePath from "node:path";
 
 export interface NofunPersonaScope {
   readonly info: NofunPersonaInfo;
@@ -16,8 +15,23 @@ export interface NofunPersonaScope {
   readonly allowedRoots: ReadonlyArray<string>;
 }
 
+// Roots are absolute posix-style paths (macOS); `..` and `.` segments are folded
+// lexically so a persona cannot be escaped with `/allowed/../elsewhere`.
+const normalize = (value: string): string => {
+  const parts: string[] = [];
+  for (const part of value.split("/")) {
+    if (part === "" || part === ".") continue;
+    if (part === "..") parts.pop();
+    else parts.push(part);
+  }
+  return `/${parts.join("/")}`;
+};
+const PATH_DELIMITER = ":";
+
 const expand = (value: string): string =>
-  value === "~" || value.startsWith("~/") ? NodePath.join(NodeOS.homedir(), value.slice(1)) : value;
+  normalize(
+    value === "~" || value.startsWith("~/") ? `${NodeOS.homedir()}${value.slice(1)}` : value,
+  );
 
 export function readNofunPersonaScope(
   env: Readonly<Record<string, string | undefined>> = process.env,
@@ -27,10 +41,10 @@ export function readNofunPersonaScope(
   const label = env.T3CODE_PERSONA_LABEL?.trim() || id;
   const accent = env.T3CODE_PERSONA_ACCENT?.trim();
   const allowedRoots = (env.T3CODE_PERSONA_ROOTS ?? "")
-    .split(NodePath.delimiter)
+    .split(PATH_DELIMITER)
     .map((entry) => entry.trim())
     .filter((entry) => entry.length > 0)
-    .map((entry) => NodePath.resolve(expand(entry)));
+    .map((entry) => expand(entry));
   return {
     info: { id, label, ...(accent ? { accent } : {}) },
     allowedRoots,
@@ -43,11 +57,9 @@ export function personaRootViolation(
   workspaceRoot: string,
 ): string | undefined {
   if (scope === undefined || scope.allowedRoots.length === 0) return undefined;
-  const target = NodePath.resolve(expand(workspaceRoot));
+  const target = expand(workspaceRoot);
   const inside = scope.allowedRoots.some(
-    (root) =>
-      target === root ||
-      target.startsWith(root.endsWith(NodePath.sep) ? root : root + NodePath.sep),
+    (root) => target === root || target.startsWith(root === "/" ? root : `${root}/`),
   );
   if (inside) return undefined;
   return (
