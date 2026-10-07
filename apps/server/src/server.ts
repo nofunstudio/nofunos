@@ -67,6 +67,8 @@ import * as PortScanner from "./preview/PortScanner.ts";
 import * as ServerBrowser from "./preview/ServerBrowser.ts";
 import * as DesktopBrowserChannel from "./preview/DesktopBrowserChannel.ts";
 import * as ServerBrowserStream from "./preview/ServerBrowserStream.ts";
+import * as MuseRoutes from "./nofun/museRoutes.ts";
+import * as MuseWorkerBridge from "./nofun/MuseWorkerBridge.ts";
 import * as WarpBridgeRoutes from "./terminal/warpBridge/routes.ts";
 import * as PreviewBrowser from "./preview/PreviewBrowser.ts";
 import * as ProcessRunner from "./processRunner.ts";
@@ -671,6 +673,7 @@ const layerMakeRoutes = Layer.mergeAll(
     DeviceHubProxy.layer,
     ServerBrowserStream.routeLayer,
     WarpBridgeRoutes.routeLayer,
+    MuseRoutes.routeLayer.pipe(Layer.provide(MuseWorkerBridge.layer)),
     ServerHttp.layerStaticAndDevRoute,
     Ws.layer,
   ),

@@ -457,6 +457,7 @@ import {
   RightPanelMaximizeControl,
 } from "./chat/PanelLayoutControls";
 import { expandedImageKey, type ExpandedImagePreview } from "./chat/ExpandedImagePreview";
+import { FleetSidebar } from "../nofun/fleet/FleetSidebar";
 import { ThreadDetailsPanel, type ThreadDetailsPanelProps } from "./chat/ThreadDetailsPanel";
 import { NoActiveThreadState } from "./NoActiveThreadState";
 import {
@@ -5361,6 +5362,10 @@ export default function ChatView(props: ChatViewProps) {
     activeThreadRef?.environmentId ?? null,
   );
   const [deviceSetupThread, setDeviceSetupThread] = useState<ScopedThreadRef | null>(null);
+  const addFleetSurface = useCallback(() => {
+    if (!activeThreadRef || !isServerThread) return;
+    useRightPanelStore.getState().open(activeThreadRef, "fleet");
+  }, [activeThreadRef, isServerThread]);
   const addDeviceSurface = useCallback(() => {
     if (!activeThreadRef) return;
     if (!deviceState.onboardingCompleted || deviceState.hostStatus === "disabled") {
@@ -8027,6 +8032,15 @@ export default function ChatView(props: ChatViewProps) {
         return;
       }
 
+      if (command === "fleet.toggle") {
+        event.preventDefault();
+        event.stopPropagation();
+        if (isServerThread && activeThreadRef) {
+          useRightPanelStore.getState().toggle(activeThreadRef, "fleet");
+        }
+        return;
+      }
+
       if (command === "diff.toggle") {
         event.preventDefault();
         event.stopPropagation();
@@ -8144,6 +8158,7 @@ export default function ChatView(props: ChatViewProps) {
     keybindings,
     handleUnsettleActiveThread,
     isServerThread,
+    activeThreadRef,
     onInterrupt,
     onToggleDiff,
     pinThread,
@@ -10819,6 +10834,11 @@ export default function ChatView(props: ChatViewProps) {
             : undefined
         }
       />
+    ) : renderedRightPanelSurface?.kind === "fleet" && activeThreadRef ? (
+      <FleetSidebar
+        environmentId={activeThreadRef.environmentId}
+        threadId={activeThreadRef.threadId}
+      />
     ) : renderedRightPanelSurface?.kind === "pull-requests" && activeThreadRef ? (
       <ThreadPullRequestsPanel threadRef={activeThreadRef} />
     ) : renderedRightPanelSurface?.kind === "device" ? (
@@ -11716,6 +11736,7 @@ export default function ChatView(props: ChatViewProps) {
           onAddPullRequest={addPullRequestSurface}
           onAddPullRequests={addPullRequestsSurface}
           onAddDevice={addDeviceSurface}
+          onAddFleet={isServerThread ? addFleetSurface : undefined}
           browserAvailable={browserAvailable}
           terminalAvailable={activeProject !== null}
           diffAvailable={isServerThread && isGitRepo}
@@ -11771,6 +11792,7 @@ export default function ChatView(props: ChatViewProps) {
             onAddPullRequest={addPullRequestSurface}
             onAddPullRequests={addPullRequestsSurface}
             onAddDevice={addDeviceSurface}
+            onAddFleet={isServerThread ? addFleetSurface : undefined}
             browserAvailable={browserAvailable}
             terminalAvailable={activeProject !== null}
             diffAvailable={isServerThread && isGitRepo}

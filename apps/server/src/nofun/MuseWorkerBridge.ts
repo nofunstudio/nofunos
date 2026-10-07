@@ -144,6 +144,17 @@ interface MuseStatusView {
   readonly stderrTail: ReadonlyArray<string>;
 }
 
+/** What the Fleet sidebar needs from a job: no prompt, no log output. */
+export interface MuseJobSummary {
+  readonly jobId: string;
+  readonly status: MuseJobStatus;
+  readonly profile: string;
+  readonly model: string;
+  readonly startedAt: string;
+  readonly finishedAt: string | null;
+  readonly note: string | null;
+}
+
 interface MuseCancelResult {
   readonly jobId: string;
   readonly status: MuseJobStatus;
@@ -169,6 +180,10 @@ export class MuseWorkerBridge extends Context.Service<
     readonly cancel: (
       jobId: string,
     ) => Effect.Effect<MuseCancelResult, MuseJobNotFoundError | MuseWorkerIoError>;
+    /** Jobs started by one thread, newest first. Read-only; no log tails. */
+    readonly listForThread: (
+      threadId: string,
+    ) => Effect.Effect<ReadonlyArray<MuseJobSummary>, MuseWorkerIoError>;
   }
 >()("t3/nofun/MuseWorkerBridge") {}
 
@@ -420,19 +435,17 @@ const make = Effect.gen(function* () {
         return { jobId: reconciled.jobId, status: reconciled.status };
       }
 
-      const workspaceInfo = yield* fileSystem
-        .stat(input.workspace)
-        .pipe(
-          Effect.mapError((cause) =>
-            cause.reason._tag === "NotFound"
-              ? new MuseWorkerInputError({ reason: "workspace_not_found" })
-              : new MuseWorkerIoError({
-                  operation: "stat-workspace",
-                  path: input.workspace,
-                  cause,
-                }),
-          ),
-        );
+      const workspaceInfo = yield* fileSystem.stat(input.workspace).pipe(
+        Effect.mapError((cause) =>
+          cause.reason._tag === "NotFound"
+            ? new MuseWorkerInputError({ reason: "workspace_not_found" })
+            : new MuseWorkerIoError({
+                operation: "stat-workspace",
+                path: input.workspace,
+                cause,
+              }),
+        ),
+      );
       if (workspaceInfo.type !== "Directory") {
         return yield* new MuseWorkerInputError({ reason: "workspace_not_directory" });
       }
@@ -602,7 +615,36 @@ const make = Effect.gen(function* () {
       return { jobId: cancelled.jobId, status: cancelled.status };
     });
 
-  return MuseWorkerBridge.of({ start, jobStatus, cancel });
+  const listForThread: MuseWorkerBridge["Service"]["listForThread"] = (threadId) =>
+    Effect.gen(function* () {
+      const entries = yield* fileSystem
+        .readDirectory(jobsRoot)
+        .pipe(Effect.catch(() => Effect.succeed([] as ReadonlyArray<string>)));
+      const records = yield* Effect.forEach(
+        entries.filter((entry) => entry !== "by-request"),
+        (entry) =>
+          readRecord(entry).pipe(
+            Effect.flatMap(reconcileRecord),
+            Effect.asSome,
+            Effect.catch(() => Effect.succeed(Option.none<MuseJobRecord>())),
+          ),
+      );
+      return records
+        .flatMap((record) => (Option.isSome(record) ? [record.value] : []))
+        .filter((record) => record.threadId === threadId)
+        .toSorted((a, b) => b.startedAt.localeCompare(a.startedAt))
+        .map((record): MuseJobSummary => ({
+          jobId: record.jobId,
+          status: record.status,
+          profile: record.profile,
+          model: record.model,
+          startedAt: record.startedAt,
+          finishedAt: record.finishedAt,
+          note: record.note,
+        }));
+    });
+
+  return MuseWorkerBridge.of({ start, jobStatus, cancel, listForThread });
 });
 
 export const layer = Layer.effect(MuseWorkerBridge, make);
