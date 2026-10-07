@@ -275,6 +275,7 @@ import {
   threadWorkCounts,
   type ThreadWorkCounts,
 } from "~/nofun/sidebar/teams";
+import { TeamUsage } from "~/nofun/sidebar/TeamUsage";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
 import { Menu, MenuItem, MenuPopup, MenuSeparator, MenuShortcut, MenuTrigger } from "./ui/menu";
@@ -5590,6 +5591,7 @@ export default function Sidebar() {
             ) : undefined
           }
         />
+        {!isSearching && teams[0] ? <TeamUsage teamId={teams[0].id} /> : null}
       </div>
       {split
         ? teams.slice(1).map((team) => (
@@ -5613,6 +5615,7 @@ export default function Sidebar() {
                   />
                 }
               />
+              <TeamUsage teamId={team.id} />
             </div>
           ))
         : null}
