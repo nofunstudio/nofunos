@@ -4751,4 +4751,124 @@ it.layer(layerTest)("ProjectionStoreV2", (it) => {
       );
     }),
   );
+  it.effect("counts running subagents and background tasks on the shell", () =>
+    Effect.gen(function* () {
+      const store = yield* ProjectionStore.ProjectionStoreV2;
+      const threadId = ThreadId.make("thread:active-work-counts");
+      const runId = RunId.make("run:active-work-counts");
+      const providerThreadId = ProviderThreadId.make("provider-thread:active-work-counts");
+      const at = DateTime.makeUnsafe("2026-09-28T12:00:00.000Z");
+      yield* store.apply({
+        id: EventId.make("event:active-work-counts:thread"),
+        type: "thread.created",
+        threadId,
+        occurredAt: at,
+        payload: {
+          createdBy: "user",
+          creationSource: "web",
+          id: threadId,
+          projectId: ProjectId.make("project:active-work-counts"),
+          title: "Fan out",
+          providerInstanceId,
+          modelSelection,
+          runtimeMode: "full-access",
+          interactionMode: "default",
+          branch: null,
+          worktreePath: null,
+          activeProviderThreadId: null,
+          lineage: { parentThreadId: null, relationshipToParent: null, rootThreadId: threadId },
+          forkedFrom: null,
+          createdAt: at,
+          updatedAt: at,
+          archivedAt: null,
+          settledOverride: null,
+          settledAt: null,
+          lastVisitedAt: null,
+          deletedAt: null,
+        },
+      });
+      yield* store.apply({
+        id: EventId.make("event:active-work-counts:run"),
+        type: "run.created",
+        threadId,
+        runId,
+        driver,
+        providerInstanceId,
+        occurredAt: at,
+        payload: {
+          id: runId,
+          threadId,
+          ordinal: 1,
+          providerInstanceId,
+          modelSelection,
+          providerThreadId,
+          userMessageId: MessageId.make("message:active-work-counts"),
+          rootNodeId: null,
+          activeAttemptId: null,
+          status: "running",
+          requestedAt: at,
+          startedAt: at,
+          completedAt: null,
+          checkpointId: null,
+          contextHandoffId: null,
+        },
+      });
+      const providerThread = {
+        id: providerThreadId,
+        driver,
+        providerInstanceId,
+        providerSessionId: null,
+        appThreadId: threadId,
+        ownerNodeId: null,
+        nativeThreadRef: null,
+        nativeConversationHeadRef: null,
+        status: "active" as const,
+        firstRunOrdinal: 1,
+        lastRunOrdinal: 1,
+        handoffIds: [],
+        forkedFrom: null,
+        pendingBackgroundTasks: [
+          { taskId: "dev", kind: "command" as const },
+          { taskId: "review", kind: "subagent" as const },
+          { taskId: "tests", kind: "subagent" as const },
+        ],
+        createdAt: at,
+        updatedAt: at,
+      };
+      yield* store.apply({
+        id: EventId.make("event:active-work-counts:roster"),
+        type: "provider-thread.updated",
+        threadId,
+        driver,
+        providerInstanceId,
+        occurredAt: at,
+        payload: providerThread,
+      });
+      const counts = Effect.gen(function* () {
+        const shell = yield* store.getThreadShell(threadId);
+        const listed = (yield* store.getShellSnapshot()).threads.find(
+          (candidate) => candidate.id === threadId,
+        );
+        // The roster does not count as "waiting" while the turn runs, but it is running work.
+        assert.deepEqual(shell?.pendingBackgroundTasks, []);
+        assert.deepEqual(
+          [listed?.activeSubagentCount, listed?.activeBackgroundTaskCount],
+          [shell?.activeSubagentCount, shell?.activeBackgroundTaskCount],
+        );
+        return [shell?.activeSubagentCount, shell?.activeBackgroundTaskCount];
+      });
+      assert.deepEqual(yield* counts, [2, 1]);
+
+      yield* store.apply({
+        id: EventId.make("event:active-work-counts:roster-ended"),
+        type: "provider-thread.updated",
+        threadId,
+        driver,
+        providerInstanceId,
+        occurredAt: at,
+        payload: { ...providerThread, pendingBackgroundTasks: [] },
+      });
+      assert.deepEqual(yield* counts, [0, 0]);
+    }),
+  );
 });

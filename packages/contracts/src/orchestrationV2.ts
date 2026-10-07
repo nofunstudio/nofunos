@@ -1881,6 +1881,11 @@ export const OrchestrationV2ThreadShell = Schema.Struct({
   pendingBackgroundTasks: Schema.optional(Schema.Array(OrchestrationV2PendingBackgroundTask)).pipe(
     Schema.withDecodingDefault(Effect.succeed([])),
   ),
+  // Running subagents and background tasks, for the sidebar's per-thread status.
+  // Unlike pendingBackgroundTasks these also count work beside a live turn.
+  // Omitted by servers that predate it; read as 0.
+  activeSubagentCount: Schema.optional(NonNegativeInt),
+  activeBackgroundTaskCount: Schema.optional(NonNegativeInt),
   // Distinct provider instances that have owned a root provider thread here,
   // in first-use order, so lists can show where a handed-off thread has been.
   // Omitted by servers that predate it; decodes to [].

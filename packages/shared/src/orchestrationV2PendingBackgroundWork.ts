@@ -286,6 +286,57 @@ export function derivePendingBackgroundWork(input: {
   return Array.from(byTaskId.values());
 }
 
+export interface ActiveWorkCounts {
+  readonly subagents: number;
+  readonly background: number;
+}
+
+/**
+ * How much work a thread has running right now, for the sidebar's per-thread
+ * status. Unlike {@link derivePendingBackgroundWork} this also counts work that
+ * runs beside a live turn: a subagent is running whether or not its parent run
+ * has settled, and so is a Claude background task. Foreground commands and
+ * tools are only background work once the run has settled. Pull request watches
+ * are not counted; they are waiting, not running. Shares the roster and
+ * turn-item sources, and the task-id dedupe, with the pending-work list.
+ */
+export function deriveActiveWorkCounts(input: {
+  readonly latestRun: PendingBackgroundWorkRun | null | undefined;
+  readonly providerThreads: ReadonlyArray<PendingBackgroundWorkProviderThread>;
+  readonly turnItems: ReadonlyArray<PendingBackgroundWorkTurnItem>;
+  readonly activeProviderThreadId?: string | null;
+  readonly hasActiveRun: boolean;
+  readonly runs?: ReadonlyArray<PendingBackgroundWorkRun>;
+}): ActiveWorkCounts {
+  const kindByTaskId = new Map<string, PendingBackgroundWorkTask["kind"]>();
+  const providerThreads =
+    input.activeProviderThreadId === undefined || input.activeProviderThreadId === null
+      ? input.providerThreads
+      : input.providerThreads.filter((thread) => thread.id === input.activeProviderThreadId);
+  for (const providerThread of providerThreads) {
+    for (const task of providerThread.pendingBackgroundTasks ?? []) {
+      if (task.taskId.length > 0 && !kindByTaskId.has(task.taskId)) {
+        kindByTaskId.set(task.taskId, task.kind);
+      }
+    }
+  }
+  const foregroundSettled =
+    !input.hasActiveRun && isLatestRunSettledForBackgroundWait(input.latestRun);
+  for (const item of pendingBackgroundTurnItems(input)) {
+    if (item.type !== "subagent" && !foregroundSettled) continue;
+    const taskId = nativeTaskIdFromTurnItem(item);
+    if (!kindByTaskId.has(taskId))
+      kindByTaskId.set(taskId, pendingTaskFromTurnItem(taskId, item).kind);
+  }
+  let subagents = 0;
+  let background = 0;
+  for (const kind of kindByTaskId.values()) {
+    if (kind === "subagent") subagents += 1;
+    else background += 1;
+  }
+  return { subagents, background };
+}
+
 function pullRequestWatchTasks(
   pullRequests: ReadonlyArray<PendingBackgroundWorkPullRequest> | undefined,
 ): Array<PendingBackgroundWorkTask> {

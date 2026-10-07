@@ -60,7 +60,10 @@ import {
   isOrchestrationV2SupersededInterrupt,
   isOrchestrationV2TurnItemVisible,
 } from "@t3tools/shared/orchestrationV2Timeline";
-import { derivePendingBackgroundWork } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
+import {
+  deriveActiveWorkCounts,
+  derivePendingBackgroundWork,
+} from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import * as Context from "effect/Context";
 import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
@@ -1388,6 +1391,16 @@ export function threadShellFromProjection(
     runs: projection.runs,
     pullRequests: projection.thread.pullRequests,
   });
+  const activeWork = deriveActiveWorkCounts({
+    latestRun,
+    providerThreads: projection.providerThreads,
+    turnItems: projection.turnItems,
+    activeProviderThreadId: projection.thread.activeProviderThreadId,
+    hasActiveRun: projection.runs.some(
+      (run) => run.status === "preparing" || run.status === "starting" || run.status === "running",
+    ),
+    runs: projection.runs,
+  });
   return {
     createdBy: projection.thread.createdBy,
     creationSource: projection.thread.creationSource,
@@ -1447,6 +1460,8 @@ export function threadShellFromProjection(
       (plan) => plan.kind === "proposed_plan" && plan.status === "active",
     ),
     pendingBackgroundTasks: [...pendingBackgroundTasks],
+    activeSubagentCount: activeWork.subagents,
+    activeBackgroundTaskCount: activeWork.background,
     providerInstanceHistory: providerInstanceHistoryForShell({
       threadId: projection.thread.id,
       providerThreads: projection.providerThreads,
@@ -1542,6 +1557,8 @@ type ShellThreadState = {
   readonly latestUserAuthoredMessageAt: DateTime.Utc | null;
   readonly hasActionableProposedPlan: boolean;
   readonly pendingBackgroundTasks: OrchestrationV2ThreadShell["pendingBackgroundTasks"];
+  readonly activeSubagentCount: number;
+  readonly activeBackgroundTaskCount: number;
   readonly providerInstanceHistory: OrchestrationV2ThreadShell["providerInstanceHistory"];
   readonly goal: OrchestrationV2ThreadShell["goal"];
   readonly itemCount: number;
@@ -1708,6 +1725,8 @@ function shellFromState(input: {
     latestUserAuthoredMessageAt: input.state.latestUserAuthoredMessageAt,
     hasActionableProposedPlan: input.state.hasActionableProposedPlan,
     pendingBackgroundTasks: input.state.pendingBackgroundTasks,
+    activeSubagentCount: input.state.activeSubagentCount,
+    activeBackgroundTaskCount: input.state.activeBackgroundTaskCount,
     providerInstanceHistory: input.state.providerInstanceHistory,
     goal: input.state.goal,
     itemCount: input.state.itemCount,
@@ -5450,6 +5469,16 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
             pullRequests: thread.pullRequests,
           }),
         ];
+        const activeWork = deriveActiveWorkCounts({
+          latestRun:
+            latestRunId === null || latestRunStatus === "idle"
+              ? null
+              : { id: latestRunId, ordinal: 0, status: latestRunStatus },
+          providerThreads: providerThreadsByThreadId.get(thread.id) ?? [],
+          turnItems: pendingTurnItemsByThreadId.get(thread.id) ?? [],
+          activeProviderThreadId: thread.activeProviderThreadId,
+          hasActiveRun: row.active_run_id !== null,
+        });
         return {
           thread,
           latestRunId,
@@ -5484,6 +5513,8 @@ export const layer: Layer.Layer<ProjectionStoreV2, never, SqlClient.SqlClient> =
               : DateTime.makeUnsafe(row.latest_user_authored_message_at),
           hasActionableProposedPlan: row.has_actionable_proposed_plan === 1,
           pendingBackgroundTasks,
+          activeSubagentCount: activeWork.subagents,
+          activeBackgroundTaskCount: activeWork.background,
           providerInstanceHistory: providerInstanceHistoryForShell({
             threadId: thread.id,
             providerThreads: providerThreadsByThreadId.get(thread.id) ?? [],

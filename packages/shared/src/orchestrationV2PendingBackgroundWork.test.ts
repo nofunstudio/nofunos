@@ -2,6 +2,7 @@ import { describe, expect, it } from "vite-plus/test";
 import type { OrchestrationV2PendingBackgroundTask } from "@t3tools/contracts";
 import {
   backgroundWorkHoldsCompletion,
+  deriveActiveWorkCounts,
   derivePendingBackgroundWork,
   turnItemUpdateCanEndBackgroundWork,
 } from "./orchestrationV2PendingBackgroundWork.ts";
@@ -585,5 +586,75 @@ describe("derivePendingBackgroundWork kinds", () => {
         }),
       ).toEqual([]);
     });
+  });
+});
+
+describe("deriveActiveWorkCounts", () => {
+  const item = (id: string, type: "subagent" | "command_execution", status = "running") => ({
+    id: id as never,
+    type,
+    status: status as never,
+    title: id,
+    nativeItemRef: null,
+  });
+  const run = (status: "running" | "completed") => ({
+    id: "run-1" as never,
+    ordinal: 1,
+    status,
+  });
+
+  it("counts a running subagent while the parent turn is live, but not its foreground command", () => {
+    expect(
+      deriveActiveWorkCounts({
+        latestRun: run("running"),
+        providerThreads: [],
+        turnItems: [item("review", "subagent"), item("npm test", "command_execution")],
+        hasActiveRun: true,
+      }),
+    ).toEqual({ subagents: 1, background: 0 });
+  });
+
+  it("counts roster tasks beside a live turn and dedupes against turn items", () => {
+    expect(
+      deriveActiveWorkCounts({
+        latestRun: run("running"),
+        providerThreads: [
+          {
+            id: "pt-1" as never,
+            pendingBackgroundTasks: [
+              { taskId: "dev", kind: "command" },
+              { taskId: "review", kind: "subagent" },
+            ],
+          },
+        ],
+        turnItems: [{ ...item("x", "subagent"), nativeItemRef: { nativeId: "review" } }],
+        hasActiveRun: true,
+      }),
+    ).toEqual({ subagents: 1, background: 1 });
+  });
+
+  it("counts left-over commands as background work once the run has settled", () => {
+    expect(
+      deriveActiveWorkCounts({
+        latestRun: run("completed"),
+        providerThreads: [],
+        turnItems: [
+          item("dev server", "command_execution"),
+          item("done", "command_execution", "completed"),
+        ],
+        hasActiveRun: false,
+      }),
+    ).toEqual({ subagents: 0, background: 1 });
+  });
+
+  it("is zero for an idle thread", () => {
+    expect(
+      deriveActiveWorkCounts({
+        latestRun: null,
+        providerThreads: [],
+        turnItems: [],
+        hasActiveRun: false,
+      }),
+    ).toEqual({ subagents: 0, background: 0 });
   });
 });
