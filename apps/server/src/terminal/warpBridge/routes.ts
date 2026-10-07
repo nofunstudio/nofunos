@@ -191,9 +191,17 @@ const attach = (
     }
     const binding = redeemed.binding;
     // The ticket pins the origin the socket must come from: the bundle's loopback
-    // origin, or the page origin that minted it. A ticket without a pin (the mint
-    // request carried no Origin) is still single use and short lived.
-    if (binding.origin !== null && request.headers.origin !== binding.origin) {
+    // origin, or the page origin that minted it. In same-origin mode the guest is
+    // served by this server, so its origin is this request's own host; that differs
+    // from the minting page on desktop (`nofun-t3://app`). A ticket without a pin
+    // (the mint request carried no Origin) is still single use and short lived.
+    const socketOrigin = request.headers.origin;
+    const fromServedGuest =
+      status.mode === "same-origin" &&
+      socketOrigin !== undefined &&
+      URL.canParse(socketOrigin) &&
+      new URL(socketOrigin).host === request.headers.host;
+    if (binding.origin !== null && socketOrigin !== binding.origin && !fromServedGuest) {
       return HttpServerResponse.text("Forbidden", { status: 403 });
     }
 
