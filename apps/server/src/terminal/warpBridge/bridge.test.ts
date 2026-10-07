@@ -205,7 +205,7 @@ describe("warp bridge lifecycle", () => {
 });
 
 describe("warp bridge re-attach", () => {
-  it.effect("re-attaches a running shell with bootstrap:false and replays its history first", () =>
+  it.effect("re-attaches a running shell with bootstrap:false and no history replay", () =>
     Effect.gen(function* () {
       const fakes = makeFakes({ history: "echo hi\r\nhi\r\n" });
       const minted = fakes.mint("warp-aaaa", { label: "Development", surface: "tab-1" });
@@ -231,10 +231,8 @@ describe("warp bridge re-attach", () => {
         kind: "text",
         text: '{"type":"ready","bootstrap":false}',
       });
-      expect(fakes.frames[1]).toMatchObject({ kind: "binary" });
-      expect(new TextDecoder().decode((fakes.frames[1] as { bytes: Uint8Array }).bytes)).toBe(
-        "echo hi\r\nhi\r\n",
-      );
+      // The guest adopts the live shell; replayed history would carry the old session's hooks.
+      expect(fakes.frames).toHaveLength(1);
 
       // The stale socket closing late must not mark the live attachment detached.
       yield* original.detach;

@@ -351,7 +351,8 @@ export function WarpThreadTerminalPanel({
   const reopenSessions = async (sessions: ReadonlyArray<ServerSession>, generation: number) => {
     for (const session of sessions) {
       if (generationRef.current !== generation) return;
-      const label = session.label ?? nextLabel();
+      const fresh = nextLabel(); // keeps later default names from repeating a restored one
+      const label = session.label ?? fresh;
       try {
         const minted = await mintSession({
           terminalId: session.terminalId,
@@ -411,7 +412,8 @@ export function WarpThreadTerminalPanel({
       reattachQueueRef.current = [];
       if (rest.length > 0) void reopenSessions(rest, generation);
     }
-    const label = revived?.label ?? hostOpenedPanesRef.current.get(paneId) ?? nextLabel();
+    const fresh = nextLabel();
+    const label = revived?.label ?? hostOpenedPanesRef.current.get(paneId) ?? fresh;
     const terminalId = revived?.terminalId ?? randomTerminalId();
     addPane(paneId, terminalId, label);
     try {

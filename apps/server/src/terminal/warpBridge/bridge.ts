@@ -95,9 +95,8 @@ export interface WarpBridge {
   /**
    * Opens the shell (or re-attaches to a running one) and starts streaming it.
    * Sends `ready` exactly once, before any output: `bootstrap:true` for a new
-   * shell, `bootstrap:false` for a re-attach, after which the manager's history
-   * is replayed so the new guest shows what the shell already printed. A ticket
-   * minted without `reattach` is refused for a terminal this bridge already
+   * shell, `bootstrap:false` for a re-attach, with no history replay (see the
+   * snapshot case). A ticket minted without `reattach` is refused for a terminal this bridge already
    * bound, so Warp's bootstrap can never run twice in one shell.
    */
   readonly attach: (
@@ -235,7 +234,10 @@ export function makeWarpBridge(deps: {
             switch (event.type) {
               case "snapshot":
                 return sendReady.pipe(
-                  Effect.andThen(sendOutput(event.snapshot.history)),
+                  // A re-attached guest adopts the live shell instead; replaying history would feed it
+                  // hooks stamped with the previous guest's session id, which it rejects and then
+                  // never finishes adopting. The cost is that earlier output is not redrawn.
+                  Effect.andThen(bootstrap ? sendOutput(event.snapshot.history) : Effect.void),
                   // A shell that exited while no guest was attached still says so on re-attach.
                   Effect.andThen(
                     event.snapshot.status === "exited"
