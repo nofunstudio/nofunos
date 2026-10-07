@@ -77,6 +77,7 @@ export interface WarpBridge {
     readonly terminalId: string;
     readonly cwd: string;
     readonly worktreePath: string | null;
+    readonly projectRoot?: string | null;
     readonly label?: string | null;
     readonly surface?: string | null;
     /** Re-attach to a terminal this bridge already owns instead of opening a new shell. */
@@ -152,6 +153,7 @@ export function makeWarpBridge(deps: {
         terminalId: input.terminalId,
         cwd: input.cwd,
         worktreePath: input.worktreePath,
+        projectRoot: input.projectRoot ?? null,
         label: input.label ?? existing?.label ?? null,
         surface: existing?.surface ?? input.surface ?? null,
         reattach,
@@ -196,7 +198,15 @@ export function makeWarpBridge(deps: {
             ...(binding.worktreePath !== null ? { worktreePath: binding.worktreePath } : {}),
             cols: size.cols,
             rows: size.rows,
-            env: { TERM: "xterm-256color", COLORTERM: "truecolor" },
+            env: {
+              TERM: "xterm-256color",
+              COLORTERM: "truecolor",
+              // The terminal manager derives T3_PROJECT_*, T3_WORKTREE_PATH and NOFUN_TEAM from these.
+              ...(binding.projectRoot ? { T3CODE_PROJECT_ROOT: binding.projectRoot } : {}),
+              ...(binding.worktreePath !== null
+                ? { T3CODE_WORKTREE_PATH: binding.worktreePath }
+                : {}),
+            },
             shell: "zsh",
           })
           .pipe(

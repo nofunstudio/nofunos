@@ -12,6 +12,8 @@ export interface WarpBinding {
   readonly terminalId: string;
   readonly cwd: string;
   readonly worktreePath: string | null;
+  /** The thread's project root, so the shell can export it; absent when the client did not send one. */
+  readonly projectRoot?: string | null;
   /** Shown on the pane and returned by `listSessions` so a reload restores the same names. */
   readonly label: string | null;
   /** The right-panel terminal tab this shell belongs to; null for the bottom drawer. */

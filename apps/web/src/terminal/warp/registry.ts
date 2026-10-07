@@ -25,6 +25,10 @@ export interface WarpPanelHandle {
   readonly run: (text: string) => Promise<WarpActionOutcome>;
   /** Puts text in Warp's input editor without submitting. */
   readonly insert: (text: string) => Promise<WarpActionOutcome>;
+  /** Opens a new shell tab, focused. False when the guest cannot open one yet. */
+  readonly openShell: () => boolean;
+  /** Closes the focused shell tab, asking first when it is running a command. */
+  readonly closeActive: () => Promise<boolean>;
 }
 
 const panels = new Map<string, WarpPanelHandle>();
