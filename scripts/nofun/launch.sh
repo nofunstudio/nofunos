@@ -24,6 +24,12 @@ listening() {
 CATCHES_LABEL="io.nofun.t3.catches"
 CATCHES_PLIST="$HOME/Library/LaunchAgents/$CATCHES_LABEL.plist"
 
+# CATCHES follows the desktop app's Network access setting so phones on the LAN reach both servers.
+catches_host_env() {
+  grep -q '"serverExposureMode": *"network-accessible"' "$HOME/.nofun-t3/userdata/desktop-settings.json" 2>/dev/null &&
+    print -r -- '<key>T3CODE_HOST</key><string>0.0.0.0</string>'
+}
+
 write_catches_agent() {
   mkdir -p "${CATCHES_PLIST:h}"
   cat >"$CATCHES_PLIST" <<PLIST
@@ -35,7 +41,7 @@ write_catches_agent() {
     <string>/bin/zsh</string><string>-c</string>
     <string>cd "$REPO" &amp;&amp; exec node scripts/nofun/persona.ts start catches</string>
   </array>
-  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$PATH</string></dict>
+  <key>EnvironmentVariables</key><dict><key>PATH</key><string>$PATH</string>$(catches_host_env)</dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><dict><key>SuccessfulExit</key><false/></dict>
   <key>StandardOutPath</key><string>$LOG_DIR/catches.log</string>
@@ -46,7 +52,7 @@ PLIST
 
 if [[ -d "$PACKAGED_APP" ]]; then
   if ! listening "$CATCHES_PORT"; then
-    [[ -f "$CATCHES_PLIST" ]] || write_catches_agent
+    write_catches_agent
     launchctl bootstrap "gui/$UID" "$CATCHES_PLIST" 2>/dev/null ||
       launchctl kickstart "gui/$UID/$CATCHES_LABEL"
   fi
