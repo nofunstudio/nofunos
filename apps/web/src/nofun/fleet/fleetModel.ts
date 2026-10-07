@@ -126,6 +126,7 @@ const DRIVER_NAMES: Record<string, string> = {
   antigravity: "Antigravity",
   pi: "Pi",
   muse: "Muse",
+  background: "",
 };
 
 export function driverName(driver: string): string {

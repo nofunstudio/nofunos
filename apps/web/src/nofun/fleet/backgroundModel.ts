@@ -8,6 +8,7 @@
  */
 import type { OrchestrationV2PendingBackgroundTask } from "@t3tools/contracts";
 import type { EnvironmentThread } from "@t3tools/client-runtime/state/models";
+import { turnItemDetailRevision } from "@t3tools/client-runtime/work-log/item-detail";
 import * as DateTime from "effect/DateTime";
 import { derivePendingBackgroundWork } from "@t3tools/shared/orchestrationV2PendingBackgroundWork";
 import {
@@ -30,6 +31,9 @@ export interface BackgroundRow {
   readonly output: ReadonlyArray<string> | null;
   readonly outputOmitted: boolean;
   readonly command: string | null;
+  /** The starting turn item and its detail revision, to fetch withheld output. */
+  readonly itemId: string | null;
+  readonly revision: string | null;
 }
 
 type Projection = NonNullable<EnvironmentThread["projection"]>;
@@ -83,6 +87,8 @@ export function deriveBackgroundRows(
       output: output.length === 0 ? null : output.split("\n").slice(-OUTPUT_TAIL_LINES),
       outputOmitted: item?.type === "command_execution" && item.outputOmitted === true,
       command,
+      itemId: item ? String(item.id) : null,
+      revision: item ? turnItemDetailRevision(item) : null,
     };
   });
 }

@@ -4,7 +4,8 @@
  * while this view is mounted; a Muse job renders its log tail. Back returns to
  * the list; the arrow-out icon opens the full thread in the chat.
  */
-import type { EnvironmentId, ServerProvider, ThreadId } from "@t3tools/contracts";
+import type { EnvironmentId, ServerProvider, ThreadId, TurnItemId } from "@t3tools/contracts";
+import { turnItemOutputText } from "@t3tools/client-runtime/work-log/item-detail";
 import { scopeThreadRef, scopedThreadKey } from "@t3tools/client-runtime/environment";
 import {
   deriveLatestThreadRun,
@@ -30,6 +31,7 @@ import {
   useThreadProjection,
   useThreadVisibleTurnItems,
 } from "../../state/entities";
+import { useTurnItemDetail } from "../../state/queries";
 import { FleetAvatar } from "./FleetAvatar";
 import { PHASE_LABEL, type FleetPhase } from "./fleetModel";
 import { useMuseJobLog } from "./museJobs";
@@ -241,13 +243,30 @@ export function formatAgo(iso: string): string {
 }
 
 /** A background task's latest output; the projection pushes updates while it runs. */
-export function BackgroundOutputView(props: { readonly row: BackgroundRow | null }) {
+export function BackgroundOutputView(props: {
+  readonly environmentId: EnvironmentId;
+  readonly threadId: ThreadId;
+  readonly row: BackgroundRow | null;
+}) {
   const { row } = props;
+  const detail = useTurnItemDetail(
+    row?.outputOmitted && row.itemId && row.revision
+      ? {
+          environmentId: props.environmentId,
+          threadId: props.threadId,
+          itemId: row.itemId as TurnItemId,
+          revision: row.revision,
+        }
+      : null,
+  );
+  const fetched = detail.data?.item;
+  const fetchedText = fetched ? turnItemOutputText(fetched) : null;
+  const lines = row?.output ?? (fetchedText ? fetchedText.split("\n").slice(-200) : null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const node = scrollRef.current;
     if (node) node.scrollTop = node.scrollHeight;
-  }, [row?.output]);
+  }, [lines]);
   return (
     <div
       ref={scrollRef}
@@ -263,15 +282,13 @@ export function BackgroundOutputView(props: { readonly row: BackgroundRow | null
               $ {row.command}
             </p>
           ) : null}
-          {row.output ? (
+          {lines ? (
             <pre className="m-0 whitespace-pre-wrap break-words font-mono text-2xs leading-relaxed text-foreground/80">
-              {row.output.join("\n")}
+              {lines.join("\n")}
             </pre>
           ) : (
             <p className="text-xs text-muted-foreground">
-              {row.outputOmitted
-                ? "Output is not loaded here. Open the full thread to read it."
-                : "No output yet."}
+              {row.outputOmitted && detail.isPending ? "Loading output." : "No output yet."}
             </p>
           )}
         </>

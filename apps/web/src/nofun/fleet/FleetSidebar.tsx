@@ -388,7 +388,11 @@ function BackgroundDetail(props: {
   return (
     <>
       <AgentViewHeader header={header} onBack={props.onBack} />
-      <BackgroundOutputView row={row ?? null} />
+      <BackgroundOutputView
+        environmentId={props.threadRef.environmentId}
+        threadId={props.threadRef.threadId}
+        row={row ?? null}
+      />
     </>
   );
 }
