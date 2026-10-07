@@ -67,12 +67,6 @@ const makeEmbedHandler = (bundle: WarpBundleServer) =>
     const url = HttpServerRequest.toURL(request);
     if (Option.isNone(url)) return HttpServerResponse.text("Bad Request", { status: 400 });
     const pathname = url.value.pathname;
-    // Relative asset URLs only resolve against a trailing slash.
-    if (pathname === WARP_EMBED_PATH_PREFIX) {
-      return HttpServerResponse.redirect(`${WARP_EMBED_PATH_PREFIX}/${url.value.search}`, {
-        status: 302,
-      });
-    }
     const status = yield* Effect.promise(() => bundle.status());
     if (status.state !== "ready" || status.mode !== "same-origin") {
       return HttpServerResponse.text("Not Found", { status: 404 });
@@ -277,7 +271,7 @@ export const routeLayer = HttpRouter.use((router) =>
     yield* router.add("GET", `${WARP_ROUTE_PREFIX}/*`, handler);
     yield* router.add("POST", `${WARP_ROUTE_PREFIX}/*`, handler);
     const embedHandler = makeEmbedHandler(bundle);
-    yield* router.add("GET", WARP_EMBED_PATH_PREFIX, embedHandler);
+    // Only the wildcard: registering the bare prefix as well wedges router construction.
     yield* router.add("GET", `${WARP_EMBED_PATH_PREFIX}/*`, embedHandler);
   }),
 );
