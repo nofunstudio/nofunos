@@ -155,6 +155,18 @@ describe("V2 client presentation", () => {
     ]);
   });
 
+  it("carries running subagent and background counts, and leaves them absent for older servers", () => {
+    const counted = presentThreadShell(environmentId, {
+      ...v2ThreadShell,
+      activeSubagentCount: 2,
+      activeBackgroundTaskCount: 1,
+    });
+    expect([counted.activeSubagentCount, counted.activeBackgroundTaskCount]).toEqual([2, 1]);
+    const older = presentThreadShell(environmentId, v2ThreadShell);
+    expect(older.activeSubagentCount).toBeUndefined();
+    expect(older.activeBackgroundTaskCount).toBeUndefined();
+  });
+
   it("parks a thread that never ran at idle while a pull request watch holds it", () => {
     const watch = { taskId: "pull-request-watch:github.com/acme/app#1", kind: "monitor" as const };
     const watched = presentThreadShell(environmentId, {
