@@ -35,8 +35,8 @@ export function registerWarpPanel(threadKey: string, handle: WarpPanelHandle): (
   panels.set(threadKey, handle);
   emit();
   return () => {
+    // `visibleKey` is owned by `setVisibleWarpPanel`; a handle swap must not clear it.
     if (panels.get(threadKey) === handle) panels.delete(threadKey);
-    if (visibleKey === threadKey) visibleKey = null;
     emit();
   };
 }

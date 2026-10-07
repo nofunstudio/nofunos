@@ -245,6 +245,13 @@ export function WarpThreadTerminalPanel({
   const handleGuestMessage = useEffectEvent((message: WarpGuestMessage) => {
     switch (message.type) {
       case "ready":
+        // A new guest instance starts with no panes; anything bound to the
+        // previous one is gone (its shells show up as detached).
+        boundPanesRef.current.clear();
+        labelCountRef.current = 0;
+        setPanes(() => new Map());
+        setActivePane(null);
+        void refreshSessions();
         return;
       case "requestSession":
         void bindPane(message.paneId);

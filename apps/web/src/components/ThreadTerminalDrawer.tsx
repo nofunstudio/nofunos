@@ -75,7 +75,7 @@ import {
 } from "../types";
 import { readLocalApi } from "~/localApi";
 import { confirmTerminalClose } from "~/lib/terminalCloseConfirm";
-import { useClientSettings } from "../hooks/useSettings";
+import { useClientSettings, useClientSettingsHydrationStatus } from "../hooks/useSettings";
 import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useAttachedTerminalSession } from "../state/terminalSessions";
 import { WarpThreadTerminalPanel } from "../terminal/warp/WarpTerminalPanel";
@@ -1723,6 +1723,10 @@ function GhosttyThreadTerminalDrawer({
  */
 export default function ThreadTerminalDrawer(props: ThreadTerminalDrawerProps) {
   const terminalRenderer = useClientSettings((settings) => settings.terminalRenderer);
+  const settingsStatus = useClientSettingsHydrationStatus();
+  // Before client settings load, the renderer is the schema default. Mounting
+  // Ghostty then would spawn a shell the Warp user never asked for, so wait.
+  if (settingsStatus === "pending" && props.mode !== "panel") return null;
   if (terminalRenderer === "warp" && props.mode !== "panel") {
     return (
       <WarpThreadTerminalPanel
