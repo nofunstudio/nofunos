@@ -51,6 +51,7 @@ import {
   scopedThreadKey,
 } from "@t3tools/client-runtime/environment";
 import {
+  type EnvironmentId,
   type EnvironmentMachineKind,
   type ScopedThreadRef,
   type ThreadId,
@@ -5511,18 +5512,35 @@ function SidebarPane(props: SidebarPaneProps) {
 const noopSearchQueryChange = () => {};
 
 /** Slim header over one team's half: its avatar, name and thread count. */
-function SidebarTeamLabel(props: { readonly teamId: string; readonly label: string }) {
+function SidebarTeamLabel(props: {
+  readonly teamId: string;
+  readonly label: string;
+  /** The team's environment; "+" adds a project there. */
+  readonly environmentId: EnvironmentId | null;
+}) {
   const persona = useMemo(
     () => resolvePersonaIdentity({ id: props.teamId, label: props.label }),
     [props.label, props.teamId],
   );
+  const { environmentId } = props;
   return (
     <div
       data-sidebar-team-label={props.teamId}
-      className="mb-1.5 flex h-6 items-center gap-1.5 px-2.5 text-2xs font-semibold uppercase tracking-wide text-sidebar-muted-foreground"
+      className="mb-1.5 flex h-6 items-center gap-1.5 pr-1 pl-2.5 text-2xs font-semibold uppercase tracking-wide text-sidebar-muted-foreground"
     >
       <PersonaAvatar persona={persona} className="size-3.5" />
-      <span className="truncate">{props.label}</span>
+      <span className="min-w-0 flex-1 truncate">{props.label}</span>
+      {environmentId ? (
+        <Button
+          size="icon-xs"
+          variant="ghost-muted"
+          aria-label={`Add a ${props.label} project`}
+          title={`Add a ${props.label} project`}
+          onClick={() => openCommandPalette({ open: "add-project", environmentId })}
+        >
+          <PlusIcon className="size-3.5" />
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -5539,6 +5557,14 @@ export default function Sidebar() {
     () => sidebarTeams([...serverConfigs.values()].map((config) => config.environment)),
     [serverConfigs],
   );
+  const environmentByTeam = useMemo(() => {
+    const byTeam = new Map<string, EnvironmentId>();
+    for (const [environmentId, config] of serverConfigs) {
+      const teamId = personaIdOf(config.environment.persona);
+      if (!byTeam.has(teamId)) byTeam.set(teamId, environmentId);
+    }
+    return byTeam;
+  }, [serverConfigs]);
   const [searchQuery, setSearchQuery] = useState("");
   const isSearching = searchQuery.trim().length > 0;
   const split = teams.length > 1;
@@ -5556,7 +5582,11 @@ export default function Sidebar() {
           onSearchQueryChange={setSearchQuery}
           teamLabel={
             split && !isSearching ? (
-              <SidebarTeamLabel teamId={teams[0]!.id} label={teams[0]!.label} />
+              <SidebarTeamLabel
+                teamId={teams[0]!.id}
+                label={teams[0]!.label}
+                environmentId={environmentByTeam.get(teams[0]!.id) ?? null}
+              />
             ) : undefined
           }
         />
@@ -5575,7 +5605,13 @@ export default function Sidebar() {
                 // Search runs in the primary pane, over every team's threads.
                 searchQuery=""
                 onSearchQueryChange={noopSearchQueryChange}
-                teamLabel={<SidebarTeamLabel teamId={team.id} label={team.label} />}
+                teamLabel={
+                  <SidebarTeamLabel
+                    teamId={team.id}
+                    label={team.label}
+                    environmentId={environmentByTeam.get(team.id) ?? null}
+                  />
+                }
               />
             </div>
           ))

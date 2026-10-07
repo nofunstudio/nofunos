@@ -238,6 +238,8 @@ function getEnvironmentBrowsePlatform(os: string | null | undefined): string {
 interface AddProjectEnvironmentOption {
   readonly environmentId: EnvironmentId;
   readonly label: string;
+  /** The machine's own name, shown under the team name. */
+  readonly machineLabel: string;
   readonly machine: EnvironmentMachineKind;
   readonly isPrimary: boolean;
   readonly isConnected: boolean;
@@ -476,7 +478,11 @@ export function CommandPalette({ children }: { children: ReactNode }) {
     (mode: SearchOverlayMode) => dispatch({ _tag: "ToggleMode", mode }),
     [],
   );
-  const openAddProject = useCallback(() => dispatch({ _tag: "OpenAddProject" }), []);
+  const openAddProject = useCallback(
+    (environmentId?: EnvironmentId) =>
+      dispatch({ _tag: "OpenAddProject", ...(environmentId ? { environmentId } : {}) }),
+    [],
+  );
   const openNewThreadIn = useCallback(() => dispatch({ _tag: "OpenNewThreadIn" }), []);
   const clearOpenIntent = useCallback(() => dispatch({ _tag: "ClearOpenIntent" }), []);
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
@@ -595,7 +601,7 @@ export function CommandPalette({ children }: { children: ReactNode }) {
         if (detail.open === "new-thread-in") {
           openNewThreadIn();
         } else if (detail.open === "add-project") {
-          openAddProject();
+          openAddProject(detail.environmentId);
         } else if (detail.query !== undefined) {
           dispatch({
             _tag: "OpenSearch",
@@ -997,13 +1003,17 @@ function OpenCommandPaletteDialog(props: {
       .filter((environment) => canCreateProjectInEnvironment(environment.connection.phase))
       .map((environment): AddProjectEnvironmentOption => {
         const isPrimary = environment.entry.target._tag === "PrimaryConnectionTarget";
+        const machineLabel = resolveEnvironmentOptionLabel({
+          isPrimary,
+          environmentId: environment.environmentId,
+          runtimeLabel: environment.label,
+        });
+        // No Fun: environments on one Mac share its name, so the team is the title.
+        const team = environment.serverConfig?.environment.persona?.label ?? "No Fun";
         return {
           environmentId: environment.environmentId,
-          label: resolveEnvironmentOptionLabel({
-            isPrimary,
-            environmentId: environment.environmentId,
-            runtimeLabel: environment.label,
-          }),
+          label: team,
+          machineLabel,
           isPrimary,
           machine: resolveEnvironmentMachineKind(environment.serverConfig),
           isConnected: canCreateProjectInEnvironment(environment.connection.phase),
@@ -1746,12 +1756,17 @@ function OpenCommandPaletteDialog(props: {
   ): CommandPaletteActionItem => ({
     kind: "action",
     value,
-    searchTerms: [option.label, option.environmentId, option.isPrimary ? "this device" : ""],
+    searchTerms: [
+      option.label,
+      option.machineLabel,
+      option.environmentId,
+      option.isPrimary ? "this device" : "",
+    ],
     title: option.label,
     description: option.isConnected
       ? option.isPrimary
-        ? "This device"
-        : option.environmentId
+        ? `${option.machineLabel} · This device`
+        : option.machineLabel
       : option.status,
     disabled: !option.isConnected,
     icon: <EnvironmentMachineIcon kind={option.machine} className={ITEM_ICON_CLASS} />,
@@ -1835,8 +1850,23 @@ function OpenCommandPaletteDialog(props: {
       return;
     }
     clearOpenIntent();
+    const target = openIntent.environmentId
+      ? addProjectEnvironmentOptions.find(
+          (option) => option.environmentId === openIntent.environmentId && option.isConnected,
+        )
+      : undefined;
+    if (target) {
+      void startAddProjectSourceSelection(target.environmentId);
+      return;
+    }
     openAddProjectFlow();
-  }, [clearOpenIntent, openAddProjectFlow, openIntent]);
+  }, [
+    addProjectEnvironmentOptions,
+    clearOpenIntent,
+    openAddProjectFlow,
+    openIntent,
+    startAddProjectSourceSelection,
+  ]);
 
   useLayoutEffect(() => {
     if (openIntent?.kind !== "new-thread-in" || projectThreadItems.length === 0) {
