@@ -73,6 +73,7 @@ import {
 // stay reachable.
 const THREAD_LINEAGE_INITIAL_COUNT = 6;
 const THREAD_LINEAGE_PAGE_COUNT = 12;
+const AGENTS_EXPANDED_MAX = 4;
 
 export function resolveThreadLineageWindow<Row>(
   rows: ReadonlyArray<Row>,
@@ -370,7 +371,8 @@ export function ThreadRelationshipsPanel(props: {
       id: "previous",
       label: view === "agents" ? "Done" : "Previous agents",
       rows: previousRows,
-      expanded: view === "agents" && activeRows.length === 0,
+      // A short agent list shows everything; a long one folds the finished ones.
+      expanded: view === "agents" && activeRows.length + previousRows.length <= AGENTS_EXPANDED_MAX,
     },
   ];
   // Provider-native subagents without a child thread have no relationship row;
@@ -488,7 +490,7 @@ export function ThreadRelationshipsPanel(props: {
     >
       {groups.map((group) => (
         <ThreadLineageGroup
-          key={`${scopedThreadKey(ref)}:${group.id}`}
+          key={`${scopedThreadKey(ref)}:${group.id}:${group.expanded}`}
           {...group}
           isFailed={isFailedPanelRow}
         >
