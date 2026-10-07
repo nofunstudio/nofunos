@@ -24,13 +24,19 @@ import { useMemo, useState } from "react";
 import { AgentElapsed } from "../../components/chat/AgentElapsed";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
-import { useThreadProjection, useThreadShell, useThreadShells } from "../../state/entities";
+import {
+  useServerConfigs,
+  useThreadProjection,
+  useThreadShell,
+  useThreadShells,
+} from "../../state/entities";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { buildThreadRouteParams } from "../../threadRoutes";
 import { FleetAvatar } from "./FleetAvatar";
 import {
   PHASE_LABEL,
+  defaultEffortFor,
   driverName,
   museRow,
   shortModelName,
@@ -144,6 +150,7 @@ function SubagentBranch(props: {
 }) {
   const { agent, environmentId } = props;
   const stopTurn = useAtomCommand(threadEnvironment.interruptTurn, { reportFailure: false });
+  const providers = useServerConfigs().get(environmentId)?.providers;
   const childId = agent.childThreadId;
   const childShell = childId ? props.shells.get(childId) : undefined;
   const active =
@@ -159,6 +166,11 @@ function SubagentBranch(props: {
     ),
     childSelection: childShell?.modelSelection,
     tokens: projection ? latestTokens(projection) : null,
+    defaultEffort: defaultEffortFor(
+      providers,
+      agent.providerInstanceId,
+      agent.model ?? childShell?.modelSelection?.model ?? null,
+    ),
     depth: props.depth,
     startedAt: iso(agent.startedAt),
     completedAt: iso(agent.completedAt),

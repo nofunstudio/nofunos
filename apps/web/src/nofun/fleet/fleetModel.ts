@@ -3,8 +3,13 @@
  * (`subagents`), the child thread shells, and Muse job summaries. The sidebar
  * renders these rows and owns no state of its own.
  */
-import type { ModelSelection, OrchestrationV2Subagent } from "@t3tools/contracts";
-import { getModelSelectionStringOptionValue } from "@t3tools/shared/model";
+import type { ModelSelection, OrchestrationV2Subagent, ServerProvider } from "@t3tools/contracts";
+import {
+  getModelSelectionStringOptionValue,
+  getProviderOptionCurrentValue,
+} from "@t3tools/shared/model";
+
+import { getProviderModelCapabilities } from "../../providerModels";
 
 export type FleetSource = "t3" | "native" | "muse";
 export type FleetPhase = "queued" | "running" | "waiting" | "done" | "failed" | "stopped";
@@ -38,6 +43,23 @@ export function resolveEffort(selection: ModelSelection | null | undefined): str
   for (const id of EFFORT_OPTION_IDS) {
     const value = getModelSelectionStringOptionValue(selection, id);
     if (value) return value;
+  }
+  return null;
+}
+
+/** Default reasoning level the server catalog lists for an instance's model. */
+export function defaultEffortFor(
+  providers: ReadonlyArray<ServerProvider> | undefined,
+  instanceId: string,
+  model: string | null,
+): string | null {
+  const provider = providers?.find((candidate) => candidate.instanceId === instanceId);
+  if (!provider || !model) return null;
+  const caps = getProviderModelCapabilities(provider.models, model, provider.driver);
+  for (const id of EFFORT_OPTION_IDS) {
+    const descriptor = caps.optionDescriptors?.find((candidate) => candidate.id === id);
+    const value = getProviderOptionCurrentValue(descriptor);
+    if (typeof value === "string" && value) return value;
   }
   return null;
 }
@@ -90,6 +112,8 @@ export interface SubagentRowInput {
   /** The child thread's model selection, when its shell is known. */
   readonly childSelection: ModelSelection | null | undefined;
   readonly tokens: number | null;
+  /** The model's default reasoning level, shown when the child never picked one. */
+  readonly defaultEffort?: string | null;
   readonly depth: number;
   readonly startedAt: string | null;
   readonly completedAt: string | null;
@@ -106,7 +130,7 @@ export function subagentRow(input: SubagentRowInput): FleetRow {
     title: input.displayTitle,
     origin: source === "t3" ? "From T3" : `${driverName(agent.driver)} native`,
     model: agent.model ?? input.childSelection?.model ?? null,
-    effort: resolveEffort(input.childSelection),
+    effort: resolveEffort(input.childSelection) ?? input.defaultEffort ?? null,
     tokens: input.tokens,
     phase,
     active: isActivePhase(phase),

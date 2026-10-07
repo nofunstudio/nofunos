@@ -41,7 +41,7 @@ const CATCHES_FLEET = `### Fleet and computer use
 
 ${CLAUDE_CODE_DEFAULTS} only across the CATCHES Claude instances (A/B) and the CATCHES Codex instance listed there. Never use Muse, Cursor or any personal account here, and do not guess a route: if one is not listed, report it unavailable.
 
-Computer use is always the CATCHES Codex instance's job, and the user will not ask for it: anything that drives a GUI outside the in-app browser (native apps, desktop-app QA, system dialogs) is \`delegate_task\` to that instance with a computer-use packet (goal, app, stop condition, one GUI owner), then you verify the result. Do not use the \`codex-computer-use\` skill (it targets the personal Codex account) or your own computer-use tools. If the CATCHES Codex instance has no computer-use tool, say so and name what is missing instead of falling back.`;
+Computer use is always the CATCHES Codex instance's job, and the user will not ask for it: anything that drives a GUI outside the in-app browser (native apps, desktop-app QA, system dialogs) is \`delegate_task\` to that instance with a computer-use packet (goal, app, stop condition, one GUI owner), then you verify the result. Do not use the \`codex-computer-use\` skill (it targets the personal Codex account) or your own computer-use tools. The CATCHES Codex instance has Codex Computer Use (its \`cua_repl\` server); if a run reports it unavailable, say so instead of falling back.`;
 
 export function fleetInstructions(personaId: string | undefined): string {
   return personaId === "catches" ? CATCHES_FLEET : NOFUN_FLEET;

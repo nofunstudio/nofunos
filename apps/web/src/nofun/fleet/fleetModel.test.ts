@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  defaultEffortFor,
   museRow,
   resolveEffort,
   shortModelName,
@@ -122,5 +123,56 @@ describe("shortModelName", () => {
   it("drops a trailing date and keeps null", () => {
     expect(shortModelName("claude-haiku-4-5-20251001")).toBe("claude-haiku-4-5");
     expect(shortModelName(null)).toBeNull();
+  });
+});
+
+describe("defaultEffortFor", () => {
+  const providers = [
+    {
+      instanceId: "claudeAgent",
+      driver: "claudeAgent",
+      models: [
+        {
+          slug: "claude-haiku-4-5",
+          name: "Haiku",
+          isCustom: false,
+          capabilities: {
+            optionDescriptors: [
+              {
+                id: "effort",
+                label: "Effort",
+                type: "select",
+                options: [
+                  { id: "low", label: "Low" },
+                  { id: "medium", label: "Medium", isDefault: true },
+                ],
+              },
+            ],
+          },
+        },
+      ],
+    },
+  ] as never;
+
+  it("reads the catalog default when the child picked no effort", () => {
+    expect(defaultEffortFor(providers, "claudeAgent", "claude-haiku-4-5")).toBe("medium");
+    expect(base({ model: "claude-haiku-4-5" }).effort).toBeNull();
+    expect(
+      subagentRow({
+        agent: agent(),
+        displayTitle: "x",
+        childSelection: undefined,
+        tokens: null,
+        defaultEffort: "medium",
+        depth: 0,
+        startedAt: null,
+        completedAt: null,
+      }).effort,
+    ).toBe("medium");
+  });
+
+  it("returns null for an unknown instance or model", () => {
+    expect(defaultEffortFor(providers, "codex", "claude-haiku-4-5")).toBeNull();
+    expect(defaultEffortFor(providers, "claudeAgent", null)).toBeNull();
   });
 });
