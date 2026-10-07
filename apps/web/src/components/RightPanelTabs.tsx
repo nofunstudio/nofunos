@@ -23,6 +23,7 @@ import {
   Globe2,
   Plus,
   TerminalSquare,
+  Bot,
 } from "lucide-react";
 import { Volume2, VolumeOff } from "lucide";
 import {
@@ -123,6 +124,8 @@ interface RightPanelTabsProps {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddDevice: () => void;
+  /** Absent where the Agents sidebar does not apply (e.g. the pull-request list page). */
+  onAddFleet?: (() => void) | undefined;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
@@ -151,6 +154,7 @@ export function shouldOpenDefaultBrowserProfileFromMenuClick(
 }
 
 const SURFACE_DISABLED_REASONS = {
+  fleet: "Agents are only available from a thread.",
   browser: "Browser previews are only available in the T3 Code desktop app.",
   terminal: "Terminal surfaces are only available from a project thread.",
   files: "Files are only available when a project is open.",
@@ -174,6 +178,7 @@ const LAUNCHER_SHORTCUT_BLOCKING_LAYERS = [
 
 /** One-line unavailability hints for the empty-state rows. */
 const SURFACE_UNAVAILABLE_HINTS = {
+  fleet: "Available from a thread.",
   browser: "Only available in the desktop app.",
   terminal: "Available when a project is open.",
   files: "Available when a project is open.",
@@ -320,6 +325,8 @@ function RightPanelEmptyState(props: {
   onAddPullRequest: () => void;
   onAddPullRequests: () => void;
   onAddDevice: () => void;
+  /** Absent where the Agents sidebar does not apply (e.g. the pull-request list page). */
+  onAddFleet?: (() => void) | undefined;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
@@ -389,6 +396,19 @@ function RightPanelEmptyState(props: {
       disabledReason: SURFACE_UNAVAILABLE_HINTS.device,
       onClick: props.onAddDevice,
     },
+    ...(props.onAddFleet
+      ? ([
+          {
+            label: "Agents",
+            description: "See every agent working for this thread.",
+            icon: Bot,
+            shortcut: "A",
+            available: true,
+            disabledReason: SURFACE_UNAVAILABLE_HINTS.fleet,
+            onClick: props.onAddFleet,
+          },
+        ] as const)
+      : []),
   ] as const;
 
   type SurfaceAction = (typeof actions)[number];
@@ -596,6 +616,8 @@ function surfaceTitle(
       return `#${surface.number}`;
     case "pull-requests":
       return "Pull requests";
+    case "fleet":
+      return "Agents";
     case "device":
       return surface.title ?? surface.target?.name ?? "Device";
     case "preview": {
@@ -679,6 +701,8 @@ function SurfaceIcon({
       );
     case "pull-requests":
       return <PullRequestGlyph.link className="size-3 shrink-0" />;
+    case "fleet":
+      return <Bot className="size-3 shrink-0" />;
     case "device":
       return surface.target?.platform === "ios" ? (
         <AppleIcon className="size-3 shrink-0" />
@@ -889,6 +913,18 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
       disabledReason: SURFACE_DISABLED_REASONS.device,
       onClick: props.onAddDevice,
     },
+    ...(props.onAddFleet
+      ? ([
+          {
+            label: "Agents",
+            icon: Bot,
+            shortcut: "A",
+            available: true,
+            disabledReason: SURFACE_DISABLED_REASONS.fleet,
+            onClick: props.onAddFleet,
+          },
+        ] as const)
+      : []),
   ] as const;
 
   const handleAddSurfaceMenuKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -1371,6 +1407,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddPullRequest={props.onAddPullRequest}
             onAddPullRequests={props.onAddPullRequests}
             onAddDevice={props.onAddDevice}
+            onAddFleet={props.onAddFleet}
             browserAvailable={props.browserAvailable}
             terminalAvailable={props.terminalAvailable}
             diffAvailable={props.diffAvailable}
