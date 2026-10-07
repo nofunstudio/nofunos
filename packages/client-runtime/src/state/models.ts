@@ -111,6 +111,9 @@ export interface EnvironmentThreadShell {
   readonly pendingBackgroundTasks: ReadonlyArray<
     NonNullable<OrchestrationV2ThreadShell["pendingBackgroundTasks"]>[number]
   >;
+  /** Running subagents and background tasks. `undefined` means the server predates them. */
+  readonly activeSubagentCount?: number;
+  readonly activeBackgroundTaskCount?: number;
   /** Provider instances that have owned the root conversation, oldest first. */
   readonly providerInstanceHistory: ReadonlyArray<ProviderInstanceId>;
   /** Native `/goal` on the active provider thread. */
@@ -259,6 +262,12 @@ export function presentThreadShell(
     hasPendingUserInput: thread.pendingRuntimeRequest?.kind === "user_input",
     hasActionableProposedPlan: thread.hasActionableProposedPlan,
     pendingBackgroundTasks: thread.pendingBackgroundTasks ?? [],
+    ...(thread.activeSubagentCount === undefined
+      ? {}
+      : { activeSubagentCount: thread.activeSubagentCount }),
+    ...(thread.activeBackgroundTaskCount === undefined
+      ? {}
+      : { activeBackgroundTaskCount: thread.activeBackgroundTaskCount }),
     providerInstanceHistory: thread.providerInstanceHistory ?? [],
     goal: thread.goal ?? null,
     itemCount: thread.itemCount,
