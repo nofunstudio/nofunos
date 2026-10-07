@@ -8,7 +8,9 @@ import { makeWarpTicketStore } from "./tickets.ts";
 const ENVIRONMENT = "env-a";
 const SIZE = { cols: 100, rows: 30 };
 
-function makeFakes(options: { now?: () => number; history?: string } = {}) {
+function makeFakes(
+  options: { now?: () => number; history?: string; labelAfterFirstOpen?: string } = {},
+) {
   const opens: Array<Parameters<WarpTerminalPort["open"]>[0]> = [];
   const closes: Array<Parameters<WarpTerminalPort["close"]>[0]> = [];
   const writes: string[] = [];
@@ -29,7 +31,8 @@ function makeFakes(options: { now?: () => number; history?: string } = {}) {
           history: "",
           exitCode: null,
           exitSignal: null,
-          label: "zsh",
+          label:
+            opens.length > 1 && options.labelAfterFirstOpen ? options.labelAfterFirstOpen : "zsh",
           updatedAt: "2026-01-01T00:00:00.000Z",
         };
       }),
@@ -240,6 +243,27 @@ describe("warp bridge re-attach", () => {
       ]);
       // Sessions are scoped to their terminal tab; the drawer sees none of them.
       expect(fakes.bridge.listSessions("thread-1")).toEqual([]);
+    }),
+  );
+
+  it.effect("tells the guest to write nothing into a busy shell on re-attach", () =>
+    Effect.gen(function* () {
+      const fakes = makeFakes({ labelAfterFirstOpen: "sleep 600" });
+      const minted = fakes.mint("warp-aaaa");
+      if (!minted.ok) throw new Error("expected a ticket");
+      const redeemed = fakes.bridge.redeemTicket(minted.ticket);
+      if (!redeemed.ok) throw new Error("expected a binding");
+      yield* fakes.bridge.attach(redeemed.binding, SIZE, fakes.send);
+      fakes.frames.length = 0;
+      const again = fakes.mint("warp-aaaa", { reattach: true });
+      if (!again.ok) throw new Error("expected a reattach ticket");
+      const binding = fakes.bridge.redeemTicket(again.ticket);
+      if (!binding.ok) throw new Error("expected a binding");
+      yield* fakes.bridge.attach(binding.binding, SIZE, fakes.send);
+      expect(fakes.frames[0]).toEqual({
+        kind: "text",
+        text: '{"type":"ready","bootstrap":false,"resume":false}',
+      });
     }),
   );
 

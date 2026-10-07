@@ -62,7 +62,12 @@ const sessionKey = (threadId: string, terminalId: string) => `${threadId}\0${ter
 const encoder = new TextEncoder();
 const MAX_WRITE_CHARS = 60_000;
 /** Control frames are fixed shapes; `code` is an integer or null, so no escaping is involved. */
-const readyFrame = (bootstrap: boolean) => `{"type":"ready","bootstrap":${bootstrap}}`;
+/**
+ * `resume:false` tells the guest to write nothing into a re-attached shell that is busy
+ * (a running command, alt-screen), so it never types into a foreground program.
+ */
+const readyFrame = (bootstrap: boolean, resume = true) =>
+  `{"type":"ready","bootstrap":${bootstrap}${resume ? "" : ',"resume":false'}}`;
 const exitFrame = (code: number | null) => `{"type":"exit","code":${code ?? "null"}}`;
 
 export interface WarpBridge {
@@ -118,6 +123,8 @@ export function makeWarpBridge(deps: {
   readonly environmentId: string;
 }): WarpBridge {
   const sessions = new Map<string, WarpSessionRecord>();
+  /** The terminal label while its shell sits at the prompt; any other label means a command is running. */
+  const idleLabels = new Map<string, string>();
   let sequence = 0;
   /** Which attachment owns a terminal now; a stale socket closing late must not mark it detached. */
   const currentAttachment = new Map<string, number>();
@@ -200,6 +207,9 @@ export function makeWarpBridge(deps: {
             Effect.mapError((cause) => ({ reason: "open_failed", cause }) as const),
           );
         const generation = String(opened.pid ?? "unknown");
+        if (bootstrap) idleLabels.set(key, opened.label);
+        // A re-attached shell whose label differs from its at-prompt label is running a command.
+        const busy = !bootstrap && opened.label !== (idleLabels.get(key) ?? opened.label);
         const record = (state: WarpSessionState): WarpSessionRecord => ({
           threadId: binding.threadId,
           terminalId: binding.terminalId,
@@ -215,7 +225,7 @@ export function makeWarpBridge(deps: {
         const sendReady = Effect.suspend(() => {
           if (readySent) return Effect.void;
           readySent = true;
-          return send({ kind: "text", text: readyFrame(bootstrap) });
+          return send({ kind: "text", text: readyFrame(bootstrap, !busy) });
         });
         const sendOutput = (data: string) =>
           data.length === 0 ? Effect.void : send({ kind: "binary", bytes: encoder.encode(data) });
@@ -247,6 +257,7 @@ export function makeWarpBridge(deps: {
                 return Effect.sync(() => {
                   sessions.delete(key);
                   currentAttachment.delete(key);
+                  idleLabels.delete(key);
                 }).pipe(Effect.andThen(send({ kind: "text", text: exitFrame(null) })));
               default:
                 return Effect.void;
@@ -303,6 +314,7 @@ export function makeWarpBridge(deps: {
         yield* deps.terminals.close({ threadId, terminalId });
         sessions.delete(key);
         currentAttachment.delete(key);
+        idleLabels.delete(key);
         return true;
       }),
 
