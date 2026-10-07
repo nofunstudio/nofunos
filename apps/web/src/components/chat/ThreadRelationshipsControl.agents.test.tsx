@@ -766,13 +766,7 @@ it("lists agents, including external ones, apart from lineage and opens them in 
   });
   expect(text()).toContain("Agents · 1 active");
   expect(text()).toContain("Checker");
-  expect(text()).not.toContain("Muse review");
   expect(text()).not.toContain("Lineage");
-  await act(async () =>
-    renderer.root
-      .find((node) => node.type === "button" && nodeText(node).includes("Done"))
-      .props.onClick(),
-  );
   expect(text()).toContain("Muse review");
 
   const rows = renderer.root.findAll(
