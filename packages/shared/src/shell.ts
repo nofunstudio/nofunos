@@ -21,7 +21,7 @@ const WINDOWS_SHELL_CANDIDATES = ["pwsh.exe", "powershell.exe"] as const;
 type ExecFileSyncLike = (
   file: string,
   args: ReadonlyArray<string>,
-  options: { encoding: "utf8"; timeout: number },
+  options: { encoding: "utf8"; timeout: number; killSignal?: NodeJS.Signals },
 ) => string;
 
 function canExecuteFile(filePath: string): boolean {
@@ -178,6 +178,12 @@ export function listLoginShellCandidates(
   return candidates;
 }
 
+/**
+ * Set by the desktop app on the backend it spawns, after it has already read the login-shell
+ * environment into its own `process.env`. The backend then skips its own probe.
+ */
+export const LOGIN_SHELL_ENV_RESOLVED_ENV = "T3CODE_LOGIN_SHELL_ENV_RESOLVED";
+
 export function readPathFromLoginShell(
   shell: string,
   execFile: ExecFileSyncLike = NodeChildProcess.execFileSync,
@@ -302,6 +308,9 @@ export const readEnvironmentFromLoginShell: ShellEnvironmentReader = (
   const output = execFile(shell, ["-ilc", buildEnvironmentCaptureCommand(names)], {
     encoding: "utf8",
     timeout: 5000,
+    // Interactive shells ignore SIGTERM, so the default timeout signal never ends a shell
+    // stuck in its init files (for example on a macOS privacy prompt) and the sync call hangs.
+    killSignal: "SIGKILL",
   });
 
   const environment: Partial<Record<string, string>> = {};

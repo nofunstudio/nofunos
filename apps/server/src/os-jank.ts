@@ -1,5 +1,6 @@
 import { HostProcessEnvironment, HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import {
+  LOGIN_SHELL_ENV_RESOLVED_ENV,
   listLoginShellCandidates,
   mergePathEntries,
   readPathFromLoginShell,
@@ -82,6 +83,12 @@ export const fixPath = Effect.fn("fixPath")(function* (): Effect.fn.Return<
       }),
     ),
   );
+  // The desktop app already merged its login-shell PATH into the env it spawned us with.
+  // Probing again would stall startup a second time on the same shell init files.
+  if (env[LOGIN_SHELL_ENV_RESOLVED_ENV] === "1") {
+    delete env[LOGIN_SHELL_ENV_RESOLVED_ENV];
+    return;
+  }
   yield* Effect.sync(() => hydratePosixPath(env, platform)).pipe(
     Effect.catchDefect((defect) =>
       Effect.sync(() => {
