@@ -425,6 +425,12 @@ export const SETTINGS_SEARCH_ITEMS = [
     searchTerms: ["queue steer running turn send default behavior composer"],
   },
   {
+    id: "terminal-renderer",
+    title: "Terminal renderer",
+    to: "/settings/general",
+    searchTerms: ["warp ghostty experimental terminal drawer zsh"],
+  },
+  {
     id: "provider-update-checks",
     title: "Provider update checks",
     to: "/settings/general",

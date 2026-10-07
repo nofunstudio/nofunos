@@ -45,6 +45,12 @@ export const TerminalOpenInput = Schema.Struct({
   rows: Schema.optional(TerminalRowsSchema),
   env: Schema.optional(TerminalEnvSchema),
   providerInstanceId: Schema.optional(ProviderInstanceId),
+  /**
+   * Launch this shell instead of the server's `SHELL`. Only applies when the
+   * open creates the session. Warp's bootstrap is Zsh-only, so the embedded
+   * Warp renderer asks for it explicitly rather than trusting the environment.
+   */
+  shell: Schema.optional(Schema.Literal("zsh")),
 });
 export type TerminalOpenInput = typeof TerminalOpenInput.Type;
 

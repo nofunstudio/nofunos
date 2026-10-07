@@ -300,6 +300,8 @@ interface TerminalSessionState {
   /** Normalized child command name when `hasRunningSubprocess`; cleared when idle. */
   childCommandLabel: string | null;
   runtimeEnv: Record<string, string> | null;
+  /** Set when the session was opened with an explicit shell (see `TerminalOpenInput.shell`). */
+  requestedShell: "zsh" | null;
 }
 
 interface PersistHistoryRequest {
@@ -2236,7 +2238,13 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
       increment(terminalSessionsTotal, { lifecycle: eventType }).pipe(
         Effect.andThen(
           Effect.gen(function* () {
-            const shellCandidates = resolveShellCandidates(shellResolver, platform, baseEnv);
+            const shellCandidates = resolveShellCandidates(
+              session.requestedShell === "zsh" && platform !== "win32"
+                ? () => "/bin/zsh"
+                : shellResolver,
+              platform,
+              baseEnv,
+            );
             const terminalEnv = createTerminalSpawnEnv(baseEnv, session.runtimeEnv, platform);
             // Append (never prepend) managed ACP agent install directories so
             // `kimi login` and friends resolve by name without shadowing any
@@ -2605,6 +2613,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
         hasRunningSubprocess: false,
         childCommandLabel: null,
         runtimeEnv: normalizedRuntimeEnv(input.env),
+        requestedShell: input.shell ?? null,
       };
 
       const createdSession = session;
@@ -3028,6 +3037,7 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
           hasRunningSubprocess: false,
           childCommandLabel: null,
           runtimeEnv: normalizedRuntimeEnv(input.env),
+          requestedShell: null,
         };
         const createdSession = session;
         yield* modifyManagerState((state) => {
