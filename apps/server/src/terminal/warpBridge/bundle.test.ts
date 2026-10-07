@@ -17,10 +17,10 @@ const tmp = () => {
   roots.push(dir);
   return dir;
 };
-const install = (home: string, manifest?: object) => {
+const install = (home: string, manifest?: object, html = "<html></html>") => {
   const dir = NodePath.join(home, "warp-embed");
   NodeFS.mkdirSync(dir, { recursive: true });
-  NodeFS.writeFileSync(NodePath.join(dir, "index.html"), "<html></html>");
+  NodeFS.writeFileSync(NodePath.join(dir, "index.html"), html);
   if (manifest)
     NodeFS.writeFileSync(NodePath.join(dir, "nofun-embed.json"), JSON.stringify(manifest));
   return dir;
@@ -70,6 +70,28 @@ describe("warp bundle serving mode", () => {
     const forced = makeWarpBundleServer(home, { NOFUN_WARP_SERVING: "same-origin" });
     expect(await forced.status()).toMatchObject({ mode: "same-origin" });
     await forced.stop();
+  });
+
+  it("without a manifest, reads index.html: absolute asset paths mean loopback, relative ones same-origin", async () => {
+    const wave1 = tmp();
+    install(
+      wave1,
+      undefined,
+      '<script type="module">import init from "/assets/client/wasm/warp.js"</script>',
+    );
+    const absolute = makeWarpBundleServer(wave1, {});
+    expect(await absolute.status()).toMatchObject({ mode: "loopback" });
+    await absolute.stop();
+
+    const relative = tmp();
+    install(
+      relative,
+      undefined,
+      '<meta content="connect-src \'self\' ws://127.0.0.1"><script type="module">import init from "./assets/client/wasm/warp.js"</script>',
+    );
+    const server = makeWarpBundleServer(relative, {});
+    expect(await server.status()).toMatchObject({ mode: "same-origin" });
+    await server.stop();
   });
 
   it("only resolves files inside the bundle", async () => {

@@ -12,8 +12,9 @@ import * as NodePath from "node:path";
  * the iframe and the attach socket are same-origin and work over LAN, Tailscale
  * and T3 Connect like the rest of the web app. That needs a bundle whose assets
  * resolve under a sub-path; a bundle says so with `nofun-embed.json`
- * (`{"subpath": true}`). A bundle without that flag imports its wasm from
- * absolute `/assets/...` paths (wave 1), which T3's own origin already owns, so
+ * (`{"subpath": true}`) or, without a manifest, by referencing no absolute
+ * paths in `index.html`. A bundle that imports its wasm from absolute
+ * `/assets/...` paths (wave 1) collides with T3's own `/assets`, so
  * it falls back to a second loopback listener and a loopback-only attach socket.
  * `NOFUN_WARP_SERVING=loopback|same-origin` overrides the manifest.
  */
@@ -90,7 +91,14 @@ const missingMessage = (dir: string, baseDir: string) =>
   `${NodePath.join(baseDir, "warp-embed")} with \`${WARP_INSTALL_COMMAND}\`, or point ` +
   "NOFUN_WARP_BUNDLE_DIR at a nofun-embed-dist directory, then press Check again.";
 
-async function servesFromSubpath(dir: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+/** An absolute-path reference (`from "/assets/..."`, `src="/x"`) breaks under a sub-path. */
+const ABSOLUTE_ASSET_REFERENCE = /(?:from\s*|import\s*\(?\s*|\b(?:src|href)\s*=\s*)["']\/(?!\/)/;
+
+/**
+ * `NOFUN_WARP_SERVING` wins, then an explicit `nofun-embed.json` `{"subpath": boolean}`,
+ * then a look at `index.html`: a page that references no absolute paths can live anywhere.
+ */
+export async function servesFromSubpath(dir: string, env: NodeJS.ProcessEnv): Promise<boolean> {
   const forced = env.NOFUN_WARP_SERVING?.trim();
   if (forced === "same-origin") return true;
   if (forced === "loopback") return false;
@@ -98,11 +106,16 @@ async function servesFromSubpath(dir: string, env: NodeJS.ProcessEnv): Promise<b
     const manifest: unknown = JSON.parse(
       await NodeFSP.readFile(NodePath.join(dir, WARP_BUNDLE_MANIFEST), "utf8"),
     );
-    return (
-      typeof manifest === "object" &&
-      manifest !== null &&
-      (manifest as Record<string, unknown>).subpath === true
-    );
+    if (typeof manifest === "object" && manifest !== null) {
+      const flag = (manifest as Record<string, unknown>).subpath;
+      if (typeof flag === "boolean") return flag;
+    }
+  } catch {
+    // No manifest: fall through to the page itself.
+  }
+  try {
+    const html = await NodeFSP.readFile(NodePath.join(dir, "index.html"), "utf8");
+    return !ABSOLUTE_ASSET_REFERENCE.test(html);
   } catch {
     return false;
   }

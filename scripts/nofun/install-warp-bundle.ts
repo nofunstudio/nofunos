@@ -8,6 +8,8 @@ import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeUtil from "node:util";
 
+import { servesFromSubpath } from "../../apps/server/src/terminal/warpBridge/bundle.ts";
+
 const { values, positionals } = NodeUtil.parseArgs({
   options: { home: { type: "string" } },
   allowPositionals: true,
@@ -47,19 +49,10 @@ if (NodeFS.existsSync(target)) {
 }
 NodeFS.renameSync(staging, target);
 
-const manifestPath = NodePath.join(target, "nofun-embed.json");
-const subpath = NodeFS.existsSync(manifestPath)
-  ? (() => {
-      try {
-        return JSON.parse(NodeFS.readFileSync(manifestPath, "utf8")).subpath === true;
-      } catch {
-        return false;
-      }
-    })()
-  : false;
+const subpath = await servesFromSubpath(target, process.env);
 console.log(`Installed the Warp bundle into ${target}`);
 console.log(
   subpath
     ? "Serving: same-origin at /warp-embed/ (works over LAN, Tailscale and T3 Connect)."
-    : "Serving: this bundle has no sub-path flag, so T3 falls back to a loopback listener (local only).",
+    : "Serving: this bundle needs absolute paths (or says it cannot run under a sub-path), so T3 falls back to a loopback listener (local only).",
 );
