@@ -20,6 +20,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { loadRepoEnv } from "../lib/public-config.ts";
+
 interface InstanceSpec {
   driver: "claudeAgent" | "codex";
   displayName?: string;
@@ -127,7 +129,8 @@ function start(personaId: string, args: string[]): void {
   const homeDir = path.resolve(expand(spec.homeDir));
   const roots = (spec.allowedProjectRoots ?? []).map((root) => path.resolve(expand(root)));
 
-  const env: NodeJS.ProcessEnv = { ...process.env };
+  // The repo .env carries T3 Connect's public config; process variables still win.
+  const env: NodeJS.ProcessEnv = { ...loadRepoEnv({ repoRoot }) };
   const stripped: string[] = [];
   for (const name of config.billingOverrideEnvNames ?? DEFAULT_STRIPPED_ENV) {
     if (env[name] !== undefined) stripped.push(name);
