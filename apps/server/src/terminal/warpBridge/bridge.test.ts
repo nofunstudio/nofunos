@@ -8,7 +8,7 @@ import { makeWarpTicketStore } from "./tickets.ts";
 const ENVIRONMENT = "env-a";
 const SIZE = { cols: 100, rows: 30 };
 
-function makeFakes(options: { now?: () => number } = {}) {
+function makeFakes(options: { now?: () => number; history?: string } = {}) {
   const opens: Array<Parameters<WarpTerminalPort["open"]>[0]> = [];
   const closes: Array<Parameters<WarpTerminalPort["close"]>[0]> = [];
   const writes: string[] = [];
@@ -45,7 +45,7 @@ function makeFakes(options: { now?: () => number } = {}) {
             worktreePath: null,
             status: "running",
             pid: nextPid,
-            history: "",
+            history: options.history ?? "",
             exitCode: null,
             exitSignal: null,
             label: "zsh",
@@ -64,7 +64,13 @@ function makeFakes(options: { now?: () => number } = {}) {
   const send = (frame: WarpFrame) => Effect.sync(() => void frames.push(frame));
   const mint = (
     terminalId: string,
-    overrides: { environmentId?: string; threadId?: string } = {},
+    overrides: {
+      environmentId?: string;
+      threadId?: string;
+      reattach?: boolean;
+      label?: string;
+      surface?: string;
+    } = {},
   ) =>
     bridge.mintTicket({
       environmentId: overrides.environmentId ?? ENVIRONMENT,
@@ -72,6 +78,9 @@ function makeFakes(options: { now?: () => number } = {}) {
       terminalId,
       cwd: "/work",
       worktreePath: null,
+      ...(overrides.reattach !== undefined ? { reattach: overrides.reattach } : {}),
+      ...(overrides.label !== undefined ? { label: overrides.label } : {}),
+      ...(overrides.surface !== undefined ? { surface: overrides.surface } : {}),
     });
   return { bridge, opens, closes, writes, listeners, frames, send, mint };
 }
@@ -151,7 +160,7 @@ describe("warp bridge lifecycle", () => {
         ["warp-bbbb", "attached"],
       ]);
 
-      // Warp keeps no scrollback to restore, so the detached shell cannot be re-bootstrapped.
+      // A plain ticket never re-bootstraps a shell that already has Warp's bootstrap.
       expect(fakes.mint("warp-aaaa")).toMatchObject({ ok: false, reason: "already_bound" });
       const direct = yield* fakes.bridge
         .attach(redeemedA.binding, SIZE, fakes.send)
@@ -188,6 +197,79 @@ describe("warp bridge lifecycle", () => {
       yield* attachment.write(bytes.slice(1, 3));
       yield* attachment.write(bytes.slice(3));
       expect(fakes.writes.join("")).toBe("é€");
+    }),
+  );
+});
+
+describe("warp bridge re-attach", () => {
+  it.effect("re-attaches a running shell with bootstrap:false and replays its history first", () =>
+    Effect.gen(function* () {
+      const fakes = makeFakes({ history: "echo hi\r\nhi\r\n" });
+      const minted = fakes.mint("warp-aaaa", { label: "Development", surface: "tab-1" });
+      if (!minted.ok) throw new Error("expected a ticket");
+      const redeemed = fakes.bridge.redeemTicket(minted.ticket);
+      if (!redeemed.ok) throw new Error("expected a binding");
+      const original = yield* fakes.bridge.attach(redeemed.binding, SIZE, fakes.send);
+      fakes.frames.length = 0;
+
+      // The page reloaded: the new guest attaches before the old socket is noticed closed.
+      const again = fakes.mint("warp-aaaa", { reattach: true });
+      if (!again.ok) throw new Error("expected a reattach ticket");
+      const redeemedAgain = fakes.bridge.redeemTicket(again.ticket);
+      if (!redeemedAgain.ok) throw new Error("expected a binding");
+      expect(redeemedAgain.binding).toMatchObject({
+        reattach: true,
+        label: "Development",
+        surface: "tab-1",
+      });
+      yield* fakes.bridge.attach(redeemedAgain.binding, SIZE, fakes.send);
+
+      expect(fakes.frames[0]).toEqual({
+        kind: "text",
+        text: '{"type":"ready","bootstrap":false}',
+      });
+      expect(fakes.frames[1]).toMatchObject({ kind: "binary" });
+      expect(new TextDecoder().decode((fakes.frames[1] as { bytes: Uint8Array }).bytes)).toBe(
+        "echo hi\r\nhi\r\n",
+      );
+
+      // The stale socket closing late must not mark the live attachment detached.
+      yield* original.detach;
+      expect(fakes.bridge.listSessions("thread-1", "tab-1").map((s) => s.state)).toEqual([
+        "attached",
+      ]);
+      // Sessions are scoped to their terminal tab; the drawer sees none of them.
+      expect(fakes.bridge.listSessions("thread-1")).toEqual([]);
+    }),
+  );
+
+  it.effect("refuses to re-attach a shell the bridge does not own or one that exited", () =>
+    Effect.gen(function* () {
+      const fakes = makeFakes();
+      expect(fakes.mint("warp-zzzz", { reattach: true })).toMatchObject({
+        ok: false,
+        reason: "unknown_session",
+      });
+
+      const minted = fakes.mint("warp-aaaa");
+      if (!minted.ok) throw new Error("expected a ticket");
+      const redeemed = fakes.bridge.redeemTicket(minted.ticket);
+      if (!redeemed.ok) throw new Error("expected a binding");
+      yield* fakes.bridge.attach(redeemed.binding, SIZE, fakes.send);
+      const listener = fakes.listeners.get("thread-1/warp-aaaa");
+      if (!listener) throw new Error("expected a stream listener");
+      yield* listener({
+        type: "exited",
+        threadId: "thread-1",
+        terminalId: "warp-aaaa",
+        createdAt: "2026-01-01T00:00:00.000Z",
+        exitCode: 0,
+        exitSignal: null,
+      } as TerminalAttachStreamEvent);
+      expect(fakes.mint("warp-aaaa", { reattach: true })).toMatchObject({
+        ok: false,
+        reason: "session_exited",
+      });
     }),
   );
 });
