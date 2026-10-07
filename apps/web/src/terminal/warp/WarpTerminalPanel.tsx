@@ -562,6 +562,20 @@ export function WarpThreadTerminalPanel({
       case "actionResult":
         pendingActionsRef.current.get(message.actionId)?.(message);
         return;
+      case "hostKey": {
+        // Focus is inside the iframe, so the host never saw the key. Replay it into the host
+        // keybinding layer (dispatched from the iframe element so it bubbles through window).
+        iframeRef.current?.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key: "`",
+            code: "Backquote",
+            ctrlKey: true,
+            bubbles: true,
+            cancelable: true,
+          }),
+        );
+        return;
+      }
     }
   });
 

@@ -35,6 +35,8 @@ export type WarpGuestMessage =
       readonly terminalId: string | null;
     }
   | { readonly type: "requestSession"; readonly paneId: string }
+  /** Additive: the guest forwards a key it would otherwise swallow (currently only Ctrl+`). */
+  | { readonly type: "hostKey"; readonly key: "ctrl+`" }
   | {
       readonly type: "activeTerminal";
       readonly paneId: string;
@@ -108,6 +110,8 @@ export function parseGuestMessage(data: unknown): WarpGuestMessage | null {
       const paneId = str(data.paneId);
       return paneId ? { type: "paneClosed", paneId, terminalId: str(data.terminalId) } : null;
     }
+    case "hostKey":
+      return data.key === "ctrl+`" ? { type: "hostKey", key: "ctrl+`" } : null;
     case "requestSession": {
       const paneId = str(data.paneId);
       return paneId ? { type: "requestSession", paneId } : null;
