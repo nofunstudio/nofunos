@@ -2646,10 +2646,16 @@ describe("CodexAdapterV2 post-settle continuation", () => {
           runtimePolicy: CODEX_TEST_RUNTIME_POLICY,
           modelSelection: CODEX_TEST_MODEL_SELECTION,
           hasT3Mcp: true,
+          // What the adapter derives for makeCodexTestTurnInput's thread.
+          workspace: { cwd: CODEX_TEST_RUNTIME_POLICY.cwd, branch: null, worktreePath: null },
         });
         assert.include(
           params.additionalContext?.t3_code_orchestration?.value ?? "",
           "delegate_task",
+        );
+        assert.include(
+          params.additionalContext?.t3_code_orchestration?.value ?? "",
+          "- Working directory: /workspace",
         );
         const entries = codexReplayPreamble({ nativeThreadId, nativeTurnId, prompt: "work" });
         const transcript = makeCodexReplayTranscript({

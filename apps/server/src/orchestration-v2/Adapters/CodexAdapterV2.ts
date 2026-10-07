@@ -91,6 +91,10 @@ import {
   buildCodexDeveloperInstructions,
 } from "../../provider/CodexDeveloperInstructions.ts";
 import {
+  t3WorkspaceContextFromTurn,
+  type T3WorkspaceContext,
+} from "../../provider/T3OrchestrationInstructions.ts";
+import {
   describeMcpElicitation,
   toMcpElicitationResponse,
 } from "../../provider/CodexMcpElicitation.ts";
@@ -703,6 +707,7 @@ export function buildCodexTurnStartParams(input: {
   readonly runtimePolicy: ProviderAdapterV2RuntimePolicy;
   readonly modelSelection: ModelSelection;
   readonly hasT3Mcp?: boolean;
+  readonly workspace?: T3WorkspaceContext;
   readonly browserToolsAvailable?: boolean;
   readonly deviceToolsAvailable?: boolean;
   /** ChatGPT token sharing does not accept service tiers. */
@@ -740,6 +745,7 @@ export function buildCodexTurnStartParams(input: {
               browser: input.browserToolsAvailable ?? true,
               device: input.deviceToolsAvailable ?? false,
             },
+            input.workspace,
           )
         : undefined;
     const collaborationMode: CodexSchema.ClientRequest__CollaborationMode | undefined =
@@ -5871,6 +5877,7 @@ export function makeCodexAdapterV2(adapterOptions: CodexAdapterV2Options): Provi
               runtimePolicy: turnInput.runtimePolicy,
               modelSelection: turnInput.modelSelection,
               hasT3Mcp: mcpSession !== undefined,
+              workspace: t3WorkspaceContextFromTurn(turnInput),
               browserToolsAvailable: mcpSession?.browserToolsAvailable ?? true,
               deviceToolsAvailable: mcpSession?.capabilities?.has("device") ?? false,
               omitServiceTier: adapterOptions.resolveRuntime !== undefined,
