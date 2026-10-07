@@ -5,7 +5,7 @@ import {
   isAtomCommandInterrupted,
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
-import { ChevronDownIcon } from "lucide-react";
+import { ChevronDownIcon, GitBranchIcon } from "lucide-react";
 import {
   memo,
   useCallback,
@@ -40,6 +40,8 @@ interface ChatHeaderProps {
   /** Drafts have no server thread yet, so the title carries no action menu. */
   isServerThread: boolean;
   activeProject: EnvironmentProject | null;
+  /** The checkout the thread works on; shown quietly beside the project. */
+  activeThreadBranch?: string | null | undefined;
   rightPanelOpen: boolean;
   onNewThreadInProject: () => void;
   onOpenProjectSettings?: (() => void) | undefined;
@@ -72,6 +74,7 @@ export const ChatHeader = memo(function ChatHeader({
   activeThreadTitle,
   isServerThread,
   activeProject,
+  activeThreadBranch,
   rightPanelOpen,
   onNewThreadInProject,
   onOpenProjectSettings,
@@ -285,6 +288,20 @@ export const ChatHeader = memo(function ChatHeader({
                 <TooltipPopup side="top">New thread in {activeProjectName}</TooltipPopup>
               </Tooltip>
             </WorkspaceBreadcrumbItem>
+            {activeThreadBranch ? (
+              <WorkspaceBreadcrumbItem className="shrink max-sm:hidden">
+                <span
+                  data-nofun-header-branch
+                  title={activeThreadBranch}
+                  className="inline-flex min-w-0 max-w-full items-center gap-1 text-xs text-muted-foreground/70"
+                >
+                  <GitBranchIcon aria-hidden className="size-3 shrink-0" />
+                  <WorkspaceBreadcrumbText className="max-w-32">
+                    {activeThreadBranch}
+                  </WorkspaceBreadcrumbText>
+                </span>
+              </WorkspaceBreadcrumbItem>
+            ) : null}
             <WorkspaceBreadcrumbSeparator>
               <WorkspaceBreadcrumbText>/</WorkspaceBreadcrumbText>
             </WorkspaceBreadcrumbSeparator>
