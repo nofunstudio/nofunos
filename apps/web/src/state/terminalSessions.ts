@@ -16,6 +16,7 @@ import { useMemo } from "react";
 
 import { useEnvironmentQuery } from "./query";
 import { terminalEnvironment } from "./terminal";
+import { isWarpTerminalId } from "../terminal/warp/protocol";
 
 const EMPTY_KNOWN_TERMINAL_SESSIONS = Object.freeze<ReadonlyArray<KnownTerminalSession>>([]);
 
@@ -169,10 +170,14 @@ export function useKnownTerminalSessions(input: {
           input: null,
         }),
   );
-  return useMemo(
-    () => selectKnownTerminalSessions(metadata.data, input.environmentId, input.threadId),
-    [input.environmentId, input.threadId, metadata.data],
-  );
+  return useMemo(() => {
+    // Warp owns its terminals; listing them here would let Ghostty attach a
+    // second renderer to a shell that already runs Warp's bootstrap.
+    const visible = metadata.data?.some((summary) => isWarpTerminalId(summary.terminalId))
+      ? metadata.data.filter((summary) => !isWarpTerminalId(summary.terminalId))
+      : metadata.data;
+    return selectKnownTerminalSessions(visible, input.environmentId, input.threadId);
+  }, [input.environmentId, input.threadId, metadata.data]);
 }
 
 export function useThreadRunningTerminalIds(input: {

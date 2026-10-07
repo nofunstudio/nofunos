@@ -2390,11 +2390,21 @@ export default function ChatView(props: ChatViewProps) {
   }, [draftThreadKeys, openTerminalThreadKeys, serverThreadKeys]);
   useEffect(() => {
     setMountedTerminalThreadKeys((currentThreadIds) => {
+      // Warp keeps no scrollback it could replay into a fresh guest, so hiding
+      // its drawer must not unmount the guest: a mounted Warp thread stays
+      // mounted (up to the hidden-thread cap) while it still exists.
+      const existingThreadKeys = new Set<string>([...serverThreadKeys, ...draftThreadKeys]);
+      const warpKeptThreadIds =
+        terminalRenderer === "warp"
+          ? currentThreadIds.filter((threadKey) => existingThreadKeys.has(threadKey))
+          : [];
       const nextThreadIds = reconcileMountedTerminalThreadIds({
         currentThreadIds,
-        openThreadIds: existingOpenTerminalThreadKeys,
+        openThreadIds: [...new Set([...existingOpenTerminalThreadKeys, ...warpKeptThreadIds])],
         activeThreadId: activeThreadKey,
-        activeThreadTerminalOpen: activeTerminalDrawerPresence.present,
+        activeThreadTerminalOpen:
+          activeTerminalDrawerPresence.present ||
+          (activeThreadKey !== null && warpKeptThreadIds.includes(activeThreadKey)),
         maxHiddenThreadCount: MAX_HIDDEN_MOUNTED_TERMINAL_THREADS,
       });
       return currentThreadIds.length === nextThreadIds.length &&
@@ -2402,7 +2412,14 @@ export default function ChatView(props: ChatViewProps) {
         ? currentThreadIds
         : nextThreadIds;
     });
-  }, [activeTerminalDrawerPresence.present, activeThreadKey, existingOpenTerminalThreadKeys]);
+  }, [
+    activeTerminalDrawerPresence.present,
+    activeThreadKey,
+    draftThreadKeys,
+    existingOpenTerminalThreadKeys,
+    serverThreadKeys,
+    terminalRenderer,
+  ]);
   const latestRunSettled = isLatestRunSettled(activeLatestRun, activeRuntime);
   const activePlan = useMemo(
     () => deriveActivePlanState(serverProjection, activeActivityRun?.runId),

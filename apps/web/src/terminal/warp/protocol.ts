@@ -4,6 +4,10 @@
  */
 export const WARP_PROTOCOL = "nofun-warp/1";
 
+/** Warp terminals live in their own id namespace (mirrors the server bridge) so Ghostty never lists them. */
+export const isWarpTerminalId = (terminalId: string): boolean =>
+  /^warp-[a-z0-9]{4,32}$/.test(terminalId);
+
 export type WarpPaneState = "connecting" | "connected" | "exited" | "disconnected" | "error";
 
 export type WarpActionFailure =
