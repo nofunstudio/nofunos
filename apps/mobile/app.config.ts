@@ -46,9 +46,9 @@ const DEVELOPMENT_ASSETS = {
 } as const;
 
 const PREVIEW_ASSETS = {
-  appIcon: fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng),
-  iosIcon: fromRepoRoot(BRAND_ASSET_PATHS.nightlyIconComposerProject),
-  splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.nightlyIosIconPng),
+  appIcon: fromRepoRoot(BRAND_ASSET_PATHS.productionIosIconPng),
+  iosIcon: fromRepoRoot(BRAND_ASSET_PATHS.productionIconComposerProject),
+  splashIcon: fromRepoRoot(BRAND_ASSET_PATHS.productionIosIconPng),
   androidAdaptiveForeground,
   androidAdaptiveBackgroundColor: "#111533",
   androidAdaptiveBackgroundImage: "./assets/android-icon-background-nightly.png",
