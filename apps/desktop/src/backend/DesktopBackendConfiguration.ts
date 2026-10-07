@@ -2,6 +2,7 @@ import * as NodeOS from "node:os";
 
 import { parsePersistedServerObservabilitySettings } from "@t3tools/shared/serverSettings";
 import { currentDesktopBootstrapToken } from "@t3tools/shared/desktopBootstrapToken";
+import { LOGIN_SHELL_ENV_RESOLVED_ENV } from "@t3tools/shared/shell";
 import * as Clock from "effect/Clock";
 import * as Context from "effect/Context";
 import * as Crypto from "effect/Crypto";
@@ -594,6 +595,8 @@ const resolvePrimaryStartConfig = Effect.fn("desktop.backendConfiguration.resolv
       env: {
         ...backendChildEnvPatch(),
         ELECTRON_RUN_AS_NODE: "1",
+        // DesktopShellEnvironment already put the login-shell PATH into process.env.
+        [LOGIN_SHELL_ENV_RESOLVED_ENV]: "1",
       },
       // Primary wants process.env (PATH, dev-runner's T3CODE_HOME, etc.).
       extendEnv: true,
