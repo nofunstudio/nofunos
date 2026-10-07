@@ -191,8 +191,13 @@ export const make = Effect.gen(function* () {
   const hostArchitecture = yield* HostProcessArchitecture;
   const environmentId = yield* identity.getEnvironmentId;
   const cwdBaseName = path.basename(serverConfig.cwd).trim();
-  const label = yield* resolveServerEnvironmentLabel({ cwdBaseName });
+  const hostLabel = yield* resolveServerEnvironmentLabel({ cwdBaseName });
   const nofunPersona = readNofunPersonaScope();
+  // Persona servers share the Mac's name; the team suffix tells them apart in clients.
+  const label =
+    nofunPersona && nofunPersona.info.id !== "nofun"
+      ? `${hostLabel} · ${nofunPersona.info.label}`
+      : hostLabel;
   const machine = yield* detectServerEnvironmentMachineKind();
   const launcher = yield* resolveServiceLauncherMode();
   const serverSelfUpdate = resolveServerSelfUpdateCapability({
