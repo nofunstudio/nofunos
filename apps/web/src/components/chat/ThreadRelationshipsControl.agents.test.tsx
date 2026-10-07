@@ -697,3 +697,84 @@ it.each(["source", "target"])(
     }
   },
 );
+
+it("lists agents, including external ones, apart from lineage and opens them in place", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const agent = {
+    id: "agent-1",
+    driver: "codex",
+    providerInstanceId: "codex",
+    childThreadId: "child-1",
+    title: "Checker",
+    prompt: "Check the change",
+    model: "gpt-5.4",
+    status: "running",
+    progress: null,
+    result: null,
+    startedAt: DateTime.makeUnsafe("2026-09-16T12:00:00Z"),
+    completedAt: null,
+    updatedAt: DateTime.makeUnsafe("2026-09-16T12:00:00Z"),
+  };
+  state.projection = {
+    thread: { id: "parent", lineage: { relationshipToParent: null }, activeProviderThreadId: null },
+    runs: [],
+    providerThreads: [],
+    providerSessions: [],
+    contextTransfers: [],
+    subagents: [agent],
+  };
+  const nodeText = (root: ReactTestInstance) =>
+    root
+      .findAll((node) => typeof node.type === "string")
+      .flatMap((node) => node.children.filter((child) => typeof child === "string"))
+      .join(" ")
+      .replace(/\s+/g, " ");
+  const text = () => nodeText(renderer.root);
+  const environmentId = EnvironmentId.make("test");
+  const threadId = ThreadId.make("parent");
+
+  await act(async () => {
+    renderer = create(
+      <ThreadRelationshipsPanel environmentId={environmentId} threadId={threadId} view="lineage" />,
+    );
+  });
+  expect(renderer.toJSON()).toBeNull();
+  await act(async () => renderer.unmount());
+
+  const onOpenAgent = vi.fn();
+  const onOpenMuse = vi.fn();
+  await act(async () => {
+    renderer = create(
+      <ThreadRelationshipsPanel
+        environmentId={environmentId}
+        threadId={threadId}
+        view="agents"
+        onOpenAgent={onOpenAgent}
+        extraAgents={[
+          {
+            key: "job-1",
+            title: "Muse review",
+            status: "completed",
+            startedAt: "2026-09-16T12:00:00Z",
+            completedAt: "2026-09-16T12:01:00Z",
+            active: false,
+            onOpen: onOpenMuse,
+          },
+        ]}
+      />,
+    );
+  });
+  expect(text()).toContain("Agents · 1 active");
+  expect(text()).toContain("Checker");
+  expect(text()).not.toContain("Lineage");
+  expect(text()).toContain("Muse review");
+
+  const rows = renderer.root.findAll(
+    (node) => node.type === "button" && typeof node.props.onClick === "function",
+  );
+  await act(async () => rows.find((row) => nodeText(row).includes("Checker"))!.props.onClick());
+  expect(onOpenAgent).toHaveBeenCalledWith("child-1");
+  expect(state.navigate).not.toHaveBeenCalled();
+  await act(async () => rows.find((row) => nodeText(row).includes("Muse review"))!.props.onClick());
+  expect(onOpenMuse).toHaveBeenCalledTimes(1);
+});

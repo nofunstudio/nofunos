@@ -231,6 +231,7 @@ export function ThreadDetailsPanel(props: ThreadDetailsPanelProps) {
             <ThreadRelationshipsPanel
               environmentId={props.environmentId}
               threadId={props.threadId}
+              view="lineage"
             />
           ) : null}
 

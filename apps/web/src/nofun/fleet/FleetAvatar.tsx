@@ -3,7 +3,7 @@
  * provider, with a status dot. Deterministic per driver, no images to load.
  */
 import { ProviderDriverKind } from "@t3tools/contracts";
-import { SparklesIcon } from "lucide-react";
+import { SparklesIcon, TerminalIcon } from "lucide-react";
 import type { CSSProperties } from "react";
 
 import { ProviderInstanceIcon } from "../../components/chat/ProviderInstanceIcon";
@@ -15,6 +15,7 @@ const TINT: Record<string, string> = {
   codex: "#6b7280",
   cursor: "#8a8a80",
   muse: "#8b5cf6",
+  background: "#6b7280",
   grok: "#6b7280",
   opencode: "#8a8480",
   antigravity: "#5b87bf",
@@ -23,6 +24,7 @@ const TINT: Record<string, string> = {
 const DOT_BY_PHASE: Record<FleetPhase, string> = {
   queued: "bg-muted-foreground/60",
   running: "bg-info",
+  quiet: "bg-warning",
   waiting: "bg-warning",
   done: "bg-success",
   failed: "bg-destructive",
@@ -42,6 +44,8 @@ export function FleetAvatar(props: { readonly driver: string; readonly phase: Fl
     >
       {props.driver === "muse" ? (
         <SparklesIcon className="size-3.5 text-(--fleet-tint)" />
+      ) : props.driver === "background" ? (
+        <TerminalIcon className="size-3.5 text-(--fleet-tint)" />
       ) : (
         <ProviderInstanceIcon
           driverKind={ProviderDriverKind.make(props.driver)}

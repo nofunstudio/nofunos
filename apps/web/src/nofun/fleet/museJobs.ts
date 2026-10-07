@@ -101,3 +101,41 @@ export function useMuseJobs(input: {
 
   return { jobs, cancel };
 }
+
+export interface MuseJobLog {
+  readonly status: MuseJobSummary["status"];
+  readonly note: string | null;
+  readonly tail: ReadonlyArray<string>;
+  readonly stderrTail: ReadonlyArray<string>;
+}
+
+/**
+ * One Muse job's log tail. A running job writes to disk without telling the
+ * client, so besides the read on open and on parent thread activity there is an
+ * explicit `refresh` for the user; nothing polls.
+ */
+export function useMuseJobLog(input: {
+  readonly environmentId: EnvironmentId;
+  readonly jobId: string;
+  readonly refreshKey: string;
+}) {
+  const [log, setLog] = useState<MuseJobLog | null>(null);
+  const [loading, setLoading] = useState(false);
+  const { environmentId, jobId, refreshKey } = input;
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const access = await readAccess(environmentId);
+    if (access !== null) {
+      const result = await request<MuseJobLog>(access, `/log?jobId=${encodeURIComponent(jobId)}`);
+      if (result !== null) setLog(result);
+    }
+    setLoading(false);
+  }, [environmentId, jobId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh, refreshKey]);
+
+  return { log, loading, refresh };
+}

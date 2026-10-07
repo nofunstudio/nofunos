@@ -10,9 +10,18 @@ import {
 } from "@t3tools/shared/model";
 
 import { getProviderModelCapabilities } from "../../providerModels";
+import { backgroundKindLabel, type BackgroundRow } from "./backgroundModel";
 
-export type FleetSource = "t3" | "native" | "muse";
-export type FleetPhase = "queued" | "running" | "waiting" | "done" | "failed" | "stopped";
+export type FleetSource = "t3" | "native" | "muse" | "background";
+export type FleetPhase =
+  | "queued"
+  | "running"
+  /** Background work with no output for a while. */
+  | "quiet"
+  | "waiting"
+  | "done"
+  | "failed"
+  | "stopped";
 
 export interface FleetRow {
   readonly key: string;
@@ -78,14 +87,34 @@ const PHASE_BY_STATUS: Record<OrchestrationV2Subagent["status"], FleetPhase> = {
 export const PHASE_LABEL: Record<FleetPhase, string> = {
   queued: "Queued",
   running: "Working",
+  quiet: "No output",
   waiting: "Needs input",
   done: "Done",
   failed: "Failed",
   stopped: "Stopped",
 };
 
+/** The thread-relationship status words the details panel's agent rows speak. */
+export function phaseRelationshipStatus(phase: FleetPhase): string {
+  switch (phase) {
+    case "queued":
+      return "pending";
+    case "running":
+      return "running";
+    case "waiting":
+    case "quiet":
+      return "waiting";
+    case "done":
+      return "completed";
+    case "failed":
+      return "failed";
+    case "stopped":
+      return "cancelled";
+  }
+}
+
 export function isActivePhase(phase: FleetPhase): boolean {
-  return phase === "queued" || phase === "running" || phase === "waiting";
+  return phase === "queued" || phase === "running" || phase === "quiet" || phase === "waiting";
 }
 
 const DRIVER_NAMES: Record<string, string> = {
@@ -97,6 +126,7 @@ const DRIVER_NAMES: Record<string, string> = {
   antigravity: "Antigravity",
   pi: "Pi",
   muse: "Muse",
+  background: "",
 };
 
 export function driverName(driver: string): string {
@@ -117,6 +147,14 @@ export interface SubagentRowInput {
   readonly depth: number;
   readonly startedAt: string | null;
   readonly completedAt: string | null;
+}
+
+export function subagentRowPhase(status: OrchestrationV2Subagent["status"]): {
+  readonly phase: FleetPhase;
+  readonly active: boolean;
+} {
+  const phase = PHASE_BY_STATUS[status];
+  return { phase, active: isActivePhase(phase) };
 }
 
 export function subagentRow(input: SubagentRowInput): FleetRow {
@@ -183,6 +221,27 @@ export function museRow(job: MuseJobSummary): FleetRow {
     completedAt: job.finishedAt,
     childThreadId: null,
     museJobId: job.jobId,
+    depth: 0,
+  };
+}
+
+export function backgroundRow(row: BackgroundRow): FleetRow {
+  const phase: FleetPhase = row.quiet ? "quiet" : "running";
+  return {
+    key: row.taskId,
+    source: "background",
+    driver: "background",
+    title: row.label,
+    origin: `This thread · ${backgroundKindLabel(row.kind)}`,
+    model: null,
+    effort: null,
+    tokens: null,
+    phase,
+    active: true,
+    startedAt: row.startedAt,
+    completedAt: null,
+    childThreadId: null,
+    museJobId: null,
     depth: 0,
   };
 }
