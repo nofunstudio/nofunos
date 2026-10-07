@@ -6,10 +6,16 @@ import * as Schema from "effect/Schema";
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { authenticateMediaRequest } from "../../auth/http.ts";
+import { ServerConfig } from "../../config.ts";
 import * as ServerEnvironment from "../../environment/ServerEnvironment.ts";
 import { TerminalManager } from "../Manager.ts";
 import { makeWarpBridge, WARP_TERMINAL_ID_PATTERN, type WarpBridge } from "./bridge.ts";
-import { makeWarpBundleServer, resolveWarpBundleDir, type WarpBundleServer } from "./bundle.ts";
+import {
+  makeWarpBundleServer,
+  WARP_EMBED_PATH_PREFIX,
+  warpContentType,
+  type WarpBundleServer,
+} from "./bundle.ts";
 import { makeWarpTicketStore } from "./tickets.ts";
 
 export const WARP_ROUTE_PREFIX = "/api/warp";
@@ -23,6 +29,9 @@ const SessionRequest = Schema.Struct({
   terminalId: Schema.String,
   cwd: Schema.String.check(Schema.isNonEmpty()),
   worktreePath: Schema.optional(Schema.NullOr(Schema.String)),
+  label: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(64)))),
+  reattach: Schema.optional(Schema.Boolean),
+  surface: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(128)))),
 });
 const CloseRequest = Schema.Struct({
   threadId: Schema.String.check(Schema.isNonEmpty()),
@@ -46,6 +55,44 @@ const parseJson = (chunk: string | Uint8Array): unknown => {
 
 const json = (body: unknown, status = 200) => HttpServerResponse.jsonUnsafe(body, { status });
 
+/**
+ * `GET /warp-embed/*`: the Warp bundle as static files on T3's own origin. It is
+ * public code with no secrets (every shell still needs a ticket), so it is
+ * unauthenticated: an iframe request cannot carry a bearer token. Only used when
+ * the bundle declares sub-path support; otherwise the loopback listener serves it.
+ */
+const makeEmbedHandler = (bundle: WarpBundleServer) =>
+  Effect.gen(function* () {
+    const request = yield* HttpServerRequest.HttpServerRequest;
+    const url = HttpServerRequest.toURL(request);
+    if (Option.isNone(url)) return HttpServerResponse.text("Bad Request", { status: 400 });
+    const pathname = url.value.pathname;
+    const status = yield* Effect.promise(() => bundle.status());
+    if (status.state !== "ready" || status.mode !== "same-origin") {
+      return HttpServerResponse.text("Not Found", { status: 404 });
+    }
+    const relative = yield* Effect.try({
+      try: () => decodeURIComponent(pathname.slice(WARP_EMBED_PATH_PREFIX.length + 1)),
+      catch: () => null,
+    }).pipe(Effect.orElseSucceed(() => null));
+    if (relative === null || relative.includes("\0")) {
+      return HttpServerResponse.text("Bad Request", { status: 400 });
+    }
+    const file = yield* Effect.promise(() => bundle.resolveFile(relative));
+    if (file === null) return HttpServerResponse.text("Not Found", { status: 404 });
+    return yield* HttpServerResponse.file(file, {
+      headers: {
+        "Content-Type": warpContentType(file),
+        // Revalidate so a reinstalled bundle is picked up; `no-transform` keeps the
+        // response compressor away from the 150+ MB wasm.
+        "Cache-Control": "no-cache, no-transform",
+        "X-Content-Type-Options": "nosniff",
+      },
+    }).pipe(
+      Effect.catch(() => Effect.succeed(HttpServerResponse.text("Not Found", { status: 404 }))),
+    );
+  });
+
 const makeHandler = (bridge: WarpBridge, bundle: WarpBundleServer) =>
   Effect.gen(function* () {
     const request = yield* HttpServerRequest.HttpServerRequest;
@@ -68,7 +115,9 @@ const makeHandler = (bridge: WarpBridge, bundle: WarpBundleServer) =>
 
     if (route === "/sessions" && request.method === "GET") {
       const threadId = url.value.searchParams.get("threadId") ?? "";
-      return json({ sessions: bridge.listSessions(threadId) });
+      return json({
+        sessions: bridge.listSessions(threadId, url.value.searchParams.get("surface")),
+      });
     }
 
     if (route === "/session" && request.method === "POST") {
@@ -85,9 +134,20 @@ const makeHandler = (bridge: WarpBridge, bundle: WarpBundleServer) =>
         terminalId: body.value.terminalId,
         cwd: body.value.cwd,
         worktreePath: body.value.worktreePath ?? null,
+        label: body.value.label ?? null,
+        surface: body.value.surface ?? null,
+        reattach: body.value.reattach === true,
+        // Loopback mode: the socket comes from the bundle's own origin. Same-origin
+        // mode: from whichever origin the authenticated page minting this ticket has.
+        origin: status.mode === "loopback" ? status.origin : (request.headers.origin ?? null),
       });
-      if (!minted.ok)
-        return json({ error: minted.reason }, minted.reason === "already_bound" ? 409 : 400);
+      if (!minted.ok) {
+        const conflict = minted.reason === "already_bound" || minted.reason === "session_exited";
+        return json(
+          { error: minted.reason },
+          conflict ? 409 : minted.reason === "unknown_session" ? 404 : 400,
+        );
+      }
       return json({ ticket: minted.ticket, expiresAt: minted.expiresAt });
     }
 
@@ -122,9 +182,7 @@ const attach = (
 ) =>
   Effect.gen(function* () {
     const status = yield* Effect.promise(() => bundle.status());
-    if (status.state !== "ready" || request.headers.origin !== status.origin) {
-      return HttpServerResponse.text("Forbidden", { status: 403 });
-    }
+    if (status.state !== "ready") return HttpServerResponse.text("Forbidden", { status: 403 });
     const ticket = url.searchParams.get("ticket") ?? "";
     // Redeemed before the upgrade: a bad ticket never reaches the PTY.
     const redeemed = bridge.redeemTicket(ticket);
@@ -132,6 +190,12 @@ const attach = (
       return HttpServerResponse.text(`Ticket ${redeemed.reason}`, { status: 401 });
     }
     const binding = redeemed.binding;
+    // The ticket pins the origin the socket must come from: the bundle's loopback
+    // origin, or the page origin that minted it. A ticket without a pin (the mint
+    // request carried no Origin) is still single use and short lived.
+    if (binding.origin !== null && request.headers.origin !== binding.origin) {
+      return HttpServerResponse.text("Forbidden", { status: 403 });
+    }
 
     return yield* Effect.scoped(
       Effect.gen(function* () {
@@ -195,7 +259,8 @@ export const routeLayer = HttpRouter.use((router) =>
   Effect.gen(function* () {
     const terminals = yield* TerminalManager;
     const environmentId = yield* (yield* ServerEnvironment.ServerEnvironment).getEnvironmentId;
-    const bundle = makeWarpBundleServer(resolveWarpBundleDir());
+    const config = yield* ServerConfig;
+    const bundle = makeWarpBundleServer(config.baseDir);
     const bridge = makeWarpBridge({
       terminals,
       tickets: makeWarpTicketStore(),
@@ -205,5 +270,8 @@ export const routeLayer = HttpRouter.use((router) =>
     const handler = makeHandler(bridge, bundle);
     yield* router.add("GET", `${WARP_ROUTE_PREFIX}/*`, handler);
     yield* router.add("POST", `${WARP_ROUTE_PREFIX}/*`, handler);
+    const embedHandler = makeEmbedHandler(bundle);
+    // Only the wildcard: registering the bare prefix as well wedges router construction.
+    yield* router.add("GET", `${WARP_EMBED_PATH_PREFIX}/*`, embedHandler);
   }),
 );

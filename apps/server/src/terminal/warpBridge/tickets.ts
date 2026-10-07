@@ -3,7 +3,7 @@ import * as NodeCrypto from "node:crypto";
 
 /**
  * What a Warp attach ticket authorizes: opening one new Zsh terminal in one
- * thread of one environment. The shell's generation (its pid) does not exist
+ * thread of one environment, or re-attaching to one this bridge already owns. The shell's generation (its pid) does not exist
  * yet; the bridge assigns it when the shell opens.
  */
 export interface WarpBinding {
@@ -12,6 +12,17 @@ export interface WarpBinding {
   readonly terminalId: string;
   readonly cwd: string;
   readonly worktreePath: string | null;
+  /** Shown on the pane and returned by `listSessions` so a reload restores the same names. */
+  readonly label: string | null;
+  /** The right-panel terminal tab this shell belongs to; null for the bottom drawer. */
+  readonly surface: string | null;
+  /** True when the terminal already exists and a new page is re-attaching to it. */
+  readonly reattach: boolean;
+  /**
+   * The `Origin` the attach socket must present. `null` means the minting
+   * request carried none, so no origin pin is possible.
+   */
+  readonly origin: string | null;
 }
 
 export type WarpTicketRejection = "unknown" | "expired" | "used";

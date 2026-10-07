@@ -294,7 +294,8 @@ import { isEditableFocused } from "../lib/editableFocus";
 import ThreadTerminalDrawer from "./ThreadTerminalDrawer";
 import {
   describeWarpRefusal,
-  getWarpPanel,
+  getRunnableWarpPanel,
+  waitForRunnableWarpPanel,
   type WarpActionOutcome,
 } from "../terminal/warp/registry";
 import {
@@ -4886,7 +4887,10 @@ export default function ChatView(props: ChatViewProps) {
         // Experimental Warp renderer: Run goes to the selected live Warp session,
         // and is refused (never retried or interrupted) when that session is busy.
         setTerminalOpen(true);
-        const panel = getWarpPanel(`${environmentId}:${activeThreadId}`);
+        // The terminal may only be mounting now; give it a moment to register.
+        const warpKey = `${environmentId}:${activeThreadId}`;
+        const panel =
+          getRunnableWarpPanel(warpKey) ?? (await waitForRunnableWarpPanel(warpKey, 8_000));
         const outcome: WarpActionOutcome = panel
           ? await panel.run(script.command)
           : { ok: false, reason: "no_session", label: null };

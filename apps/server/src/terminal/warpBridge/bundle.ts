@@ -6,13 +6,25 @@ import type * as NodeNet from "node:net";
 import * as NodePath from "node:path";
 
 /**
- * Where the built Warp web guest lives. The guest imports its wasm from absolute
- * `/assets/...` paths, so it must be served from an origin root; T3's own origin
- * already owns `/assets`. The bundle is therefore served by a second loopback
- * listener, which also keeps the guest's origin separate from the T3 app.
+ * Where the built Warp web guest lives and how it is served.
+ *
+ * Preferred: T3 itself serves the bundle at `/warp-embed/` on its own origin, so
+ * the iframe and the attach socket are same-origin and work over LAN, Tailscale
+ * and T3 Connect like the rest of the web app. That needs a bundle whose assets
+ * resolve under a sub-path; a bundle says so with `nofun-embed.json`
+ * (`{"subpath": true}`) or, without a manifest, by referencing no absolute
+ * paths in `index.html`. A bundle that imports its wasm from absolute
+ * `/assets/...` paths (wave 1) collides with T3's own `/assets`, so
+ * it falls back to a second loopback listener and a loopback-only attach socket.
+ * `NOFUN_WARP_SERVING=loopback|same-origin` overrides the manifest.
  */
 export const DEFAULT_WARP_BUNDLE_DIR =
   "/Users/nofun/Documents/GitHub/.wt/warp-nofunos-terminal/nofun-embed-dist";
+export const WARP_EMBED_PATH_PREFIX = "/warp-embed";
+export const WARP_BUNDLE_MANIFEST = "nofun-embed.json";
+/** The command the drawer's missing-bundle message points at. */
+export const WARP_INSTALL_COMMAND =
+  "node scripts/nofun/install-warp-bundle.ts <path to nofun-embed-dist>";
 
 const CONTENT_TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -31,13 +43,24 @@ const CONTENT_TYPES: Record<string, string> = {
 };
 
 export type WarpBundleStatus =
-  | { readonly state: "ready"; readonly origin: string }
+  | {
+      readonly state: "ready";
+      /** `same-origin`: T3 serves `/warp-embed/` itself. `loopback`: a second listener at `origin`. */
+      readonly mode: "same-origin" | "loopback";
+      /** The bundle's own origin in loopback mode; null when it shares T3's origin. */
+      readonly origin: string | null;
+    }
   | { readonly state: "missing"; readonly dir: string; readonly message: string };
 
 export interface WarpBundleServer {
   readonly status: () => Promise<WarpBundleStatus>;
+  /** Absolute path of a bundle file for a `/warp-embed/...` request path, or null when outside the bundle. */
+  readonly resolveFile: (relativePath: string) => Promise<string | null>;
   readonly stop: () => Promise<void>;
 }
+
+export const warpContentType = (path: string): string =>
+  CONTENT_TYPES[NodePath.extname(path).toLowerCase()] ?? "application/octet-stream";
 
 const isFile = async (path: string) => {
   try {
@@ -47,25 +70,87 @@ const isFile = async (path: string) => {
   }
 };
 
-export function resolveWarpBundleDir(env: NodeJS.ProcessEnv = process.env): string {
-  return env.NOFUN_WARP_BUNDLE_DIR?.trim() || DEFAULT_WARP_BUNDLE_DIR;
+/**
+ * Bundle directory, in order: `NOFUN_WARP_BUNDLE_DIR`, `<T3 home>/warp-embed`
+ * (what `scripts/nofun/install-warp-bundle.ts` fills), then the dev worktree
+ * build. Each is rechecked per call, so installing a bundle needs no restart.
+ */
+export async function resolveWarpBundleDir(
+  baseDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
+  const explicit = env.NOFUN_WARP_BUNDLE_DIR?.trim();
+  if (explicit) return explicit;
+  const installed = NodePath.join(baseDir, "warp-embed");
+  if (await isFile(NodePath.join(installed, "index.html"))) return installed;
+  return DEFAULT_WARP_BUNDLE_DIR;
 }
 
-export function makeWarpBundleServer(dir: string): WarpBundleServer {
+const missingMessage = (dir: string, baseDir: string) =>
+  `The Warp web bundle was not found at ${dir}. Install a built bundle into ` +
+  `${NodePath.join(baseDir, "warp-embed")} with \`${WARP_INSTALL_COMMAND}\`, or point ` +
+  "NOFUN_WARP_BUNDLE_DIR at a nofun-embed-dist directory, then press Check again.";
+
+/** An absolute-path reference (`from "/assets/..."`, `src="/x"`) breaks under a sub-path. */
+const ABSOLUTE_ASSET_REFERENCE = /(?:from\s*|import\s*\(?\s*|\b(?:src|href)\s*=\s*)["']\/(?!\/)/;
+
+/**
+ * `NOFUN_WARP_SERVING` wins, then an explicit `nofun-embed.json` `{"subpath": boolean}`,
+ * then a look at `index.html`: a page that references no absolute paths can live anywhere.
+ */
+export async function servesFromSubpath(dir: string, env: NodeJS.ProcessEnv): Promise<boolean> {
+  const forced = env.NOFUN_WARP_SERVING?.trim();
+  if (forced === "same-origin") return true;
+  if (forced === "loopback") return false;
+  try {
+    const manifest: unknown = JSON.parse(
+      await NodeFSP.readFile(NodePath.join(dir, WARP_BUNDLE_MANIFEST), "utf8"),
+    );
+    if (typeof manifest === "object" && manifest !== null) {
+      const flag = (manifest as Record<string, unknown>).subpath;
+      if (typeof flag === "boolean") return flag;
+    }
+  } catch {
+    // No manifest: fall through to the page itself.
+  }
+  try {
+    const html = await NodeFSP.readFile(NodePath.join(dir, "index.html"), "utf8");
+    return !ABSOLUTE_ASSET_REFERENCE.test(html);
+  } catch {
+    return false;
+  }
+}
+
+export function makeWarpBundleServer(
+  baseDir: string,
+  env: NodeJS.ProcessEnv = process.env,
+): WarpBundleServer {
   let started: Promise<WarpBundleStatus> | null = null;
   let server: NodeHttp.Server | null = null;
+  let currentRoot: string | null = null;
+
+  const resolveFile = async (relativePath: string): Promise<string | null> => {
+    const root = currentRoot ?? NodePath.normalize(await resolveWarpBundleDir(baseDir, env));
+    const target = NodePath.normalize(
+      NodePath.join(
+        root,
+        relativePath === "" || relativePath === "/" ? "index.html" : relativePath,
+      ),
+    );
+    if (target !== root && !target.startsWith(root + NodePath.sep)) return null;
+    return (await isFile(target)) ? target : null;
+  };
 
   const start = async (): Promise<WarpBundleStatus> => {
+    const dir = await resolveWarpBundleDir(baseDir, env);
     if (!(await isFile(NodePath.join(dir, "index.html")))) {
-      return {
-        state: "missing",
-        dir,
-        message:
-          `The Warp web bundle was not found at ${dir}. Build it (nofun-embed/package.sh in the Warp ` +
-          "worktree) or point NOFUN_WARP_BUNDLE_DIR at its nofun-embed-dist directory, then reopen the terminal.",
-      };
+      return { state: "missing", dir, message: missingMessage(dir, baseDir) };
     }
     const root = NodePath.normalize(dir);
+    currentRoot = root;
+    if (await servesFromSubpath(dir, env)) {
+      return { state: "ready", mode: "same-origin", origin: null };
+    }
     const listener = NodeHttp.createServer((request, response) => {
       void (async () => {
         try {
@@ -119,14 +204,18 @@ export function makeWarpBundleServer(dir: string): WarpBundleServer {
       listener.listen(0, "127.0.0.1", () => resolve());
     });
     const { port } = listener.address() as NodeNet.AddressInfo;
-    return { state: "ready", origin: `http://127.0.0.1:${port}` };
+    return { state: "ready", mode: "loopback", origin: `http://127.0.0.1:${port}` };
   };
 
   return {
+    resolveFile,
     status: () => {
       started ??= start().then((status) => {
         // A missing bundle is rechecked on the next call so building it needs no server restart.
-        if (status.state === "missing") started = null;
+        if (status.state === "missing") {
+          started = null;
+          currentRoot = null;
+        }
         return status;
       });
       return started;
@@ -135,6 +224,7 @@ export function makeWarpBundleServer(dir: string): WarpBundleServer {
       const current = server;
       server = null;
       started = null;
+      currentRoot = null;
       if (current) await new Promise<void>((resolve) => current.close(() => resolve()));
     },
   };

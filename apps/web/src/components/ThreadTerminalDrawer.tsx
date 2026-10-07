@@ -1718,19 +1718,23 @@ function GhosttyThreadTerminalDrawer({
 
 /**
  * Renderer seam. Ghostty is the default and keeps every existing prop and
- * behavior; the experimental Warp renderer replaces only the drawer, never the
- * right-panel terminal surface.
+ * behavior. The experimental Warp renderer replaces the bottom drawer and the
+ * right-panel terminal tab alike; each right-panel terminal tab gets its own
+ * Warp guest, because one iframe cannot live in two places without reloading.
  */
 export default function ThreadTerminalDrawer(props: ThreadTerminalDrawerProps) {
   const terminalRenderer = useClientSettings((settings) => settings.terminalRenderer);
   const settingsStatus = useClientSettingsHydrationStatus();
   // Before client settings load, the renderer is the schema default. Mounting
   // Ghostty then would spawn a shell the Warp user never asked for, so wait.
-  if (settingsStatus === "pending" && props.mode !== "panel") return null;
-  if (terminalRenderer === "warp" && props.mode !== "panel") {
+  if (settingsStatus === "pending") return null;
+  if (terminalRenderer === "warp") {
+    const isPanel = props.mode === "panel";
     return (
       <WarpThreadTerminalPanel
         threadRef={props.threadRef}
+        surfaceId={isPanel ? props.activeTerminalGroupId : undefined}
+        layout={isPanel ? "panel" : "drawer"}
         cwd={props.cwd}
         worktreePath={props.worktreePath}
         visible={props.visible ?? true}
