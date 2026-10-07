@@ -272,6 +272,7 @@ import {
   sidebarTeams,
   threadsOfTeam,
   threadWorkCounts,
+  type ThreadWorkCounts,
 } from "~/nofun/sidebar/teams";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { SidebarHeaderIconButton, SidebarThreadHeader } from "./sidebar/SidebarThreadHeader";
@@ -361,8 +362,8 @@ function terminalProcessLabel(count: number): string {
  * Running subagents and background tasks of one thread, as two tiny icon and
  * count pills. Nothing is drawn for a thread with neither.
  */
-function SidebarThreadWorkCounts(props: { thread: SidebarThreadSummary }) {
-  const { subagents, background } = threadWorkCounts(props.thread);
+function SidebarThreadWorkCounts(props: { counts: ThreadWorkCounts }) {
+  const { subagents, background } = props.counts;
   if (subagents === 0 && background === 0) return null;
   return (
     <span
@@ -1900,6 +1901,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
   }
 
   const diff = latestRunDiff(thread);
+  const workCounts = threadWorkCounts(thread);
 
   return (
     <li
@@ -2103,32 +2105,39 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 </span>
               ) : null}
             </div>
-            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-secondary-label text-xs">
-              <SidebarThreadWorkCounts thread={thread} />
-              <span className="flex-1" />
-              {terminalStatusIcon}
-              {prBadge}
-              {diff ? (
-                <span className="shrink-0 font-mono">
-                  <span className="text-diff-addition-foreground">+{diff.insertions}</span>{" "}
-                  <span className="text-diff-deletion-foreground">−{diff.deletions}</span>
-                </span>
-              ) : null}
-              <span
-                aria-hidden
-                className="pointer-events-none ml-auto inline-flex shrink-0 items-center gap-1"
-              >
-                {isRemote ? (
-                  <span className="inline-flex shrink-0 items-center text-sidebar-muted-foreground/70">
-                    <EnvironmentMachineIcon
-                      aria-hidden
-                      kind={props.environmentMachine}
-                      className="size-3.5"
-                    />
+            {/* Only drawn when there is something to say: counts, terminal, PR, diff or a remote machine. */}
+            {workCounts.subagents + workCounts.background > 0 ||
+            terminalStatusIcon ||
+            prBadge ||
+            diff ||
+            isRemote ? (
+              <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-secondary-label text-xs">
+                <SidebarThreadWorkCounts counts={workCounts} />
+                <span className="flex-1" />
+                {terminalStatusIcon}
+                {prBadge}
+                {diff ? (
+                  <span className="shrink-0 font-mono">
+                    <span className="text-diff-addition-foreground">+{diff.insertions}</span>{" "}
+                    <span className="text-diff-deletion-foreground">−{diff.deletions}</span>
                   </span>
                 ) : null}
-              </span>
-            </div>
+                <span
+                  aria-hidden
+                  className="pointer-events-none ml-auto inline-flex shrink-0 items-center gap-1"
+                >
+                  {isRemote ? (
+                    <span className="inline-flex shrink-0 items-center text-sidebar-muted-foreground/70">
+                      <EnvironmentMachineIcon
+                        aria-hidden
+                        kind={props.environmentMachine}
+                        className="size-3.5"
+                      />
+                    </span>
+                  ) : null}
+                </span>
+              </div>
+            ) : null}
           </div>
           {props.jumpLabel ? <JumpHintBadge label={props.jumpLabel} /> : null}
         </TooltipTrigger>
@@ -5510,7 +5519,7 @@ function SidebarTeamLabel(props: { readonly teamId: string; readonly label: stri
   return (
     <div
       data-sidebar-team-label={props.teamId}
-      className="mb-1 flex h-6 items-center gap-1.5 px-2.5 text-2xs font-semibold uppercase tracking-wide text-sidebar-muted-foreground"
+      className="mb-1.5 flex h-6 items-center gap-1.5 px-2.5 text-2xs font-semibold uppercase tracking-wide text-sidebar-muted-foreground"
     >
       <PersonaAvatar persona={persona} className="size-3.5" />
       <span className="truncate">{props.label}</span>
