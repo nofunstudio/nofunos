@@ -2,6 +2,10 @@ import { assert, describe, it } from "@effect/vitest";
 
 import {
   T3_CODE_ORCHESTRATION_INSTRUCTIONS,
+  fleetInstructions,
+  t3OrchestrationInstructionsFor,
+  t3WorkspaceInstructions,
+  visualOutputInstructions,
   t3AcpPromptWithInstructions,
   t3OrchestrationPromptForFirstRun,
   t3OrchestrationSystemPrompt,
@@ -86,5 +90,52 @@ describe("T3 orchestration provider instructions", () => {
     assert.include(withoutMcp, "T3 Code interaction mode: Default");
     assert.notInclude(withoutMcp, "T3 Code collaborative browser");
     assert.notInclude(withoutMcp, "T3 Code orchestration");
+  });
+
+  it("sends computer use to Codex and names /agent-fleet as the only skill", () => {
+    assert.include(T3_CODE_ORCHESTRATION_INSTRUCTIONS, "never names a skill");
+    assert.include(T3_CODE_ORCHESTRATION_INSTRUCTIONS, "/agent-fleet");
+    assert.include(T3_CODE_ORCHESTRATION_INSTRUCTIONS, "Computer use is always Codex's job");
+    assert.include(T3_CODE_ORCHESTRATION_INSTRUCTIONS, "`codex-computer-use` skill");
+    assert.notInclude(T3_CODE_ORCHESTRATION_INSTRUCTIONS, "CATCHES Codex instance");
+  });
+
+  it("states the team and project of the turn", () => {
+    const text = t3OrchestrationInstructionsFor({
+      projectName: "nofunos",
+      projectRoot: "/work/nofunos",
+      worktreePath: "/work/wt/feature",
+      branch: "feature/x",
+      cwd: "/work/wt/feature",
+    });
+    assert.include(text, "### Where you are");
+    assert.include(text, "- Team: No Fun");
+    assert.include(text, "- Project: nofunos");
+    assert.include(text, "- Project root: /work/nofunos");
+    assert.include(text, "- Thread worktree: /work/wt/feature");
+    assert.include(text, "- Branch: feature/x");
+    assert.notInclude(T3_CODE_ORCHESTRATION_INSTRUCTIONS, "### Where you are");
+  });
+
+  it("describes a root checkout by its working directory", () => {
+    const text = t3WorkspaceInstructions({ projectName: "app", cwd: "/work/app", branch: null });
+    assert.include(text, "- Working directory: /work/app (the project checkout)");
+    assert.notInclude(text, "Thread worktree");
+    assert.notInclude(text, "Branch");
+  });
+
+  it("scopes CATCHES to its own team, Codex and artifacts", () => {
+    const catches = {
+      info: { id: "catches", label: "CATCHES", icon: "catches" },
+      allowedRoots: [],
+    };
+    const text = t3WorkspaceInstructions({ projectName: "shop" }, catches);
+    assert.include(text, "- Team: CATCHES");
+    const fleet = fleetInstructions("catches");
+    assert.include(fleet, "CATCHES Codex instance");
+    assert.include(fleet, "Never use Muse, Cursor or any personal account");
+    assert.include(fleet, "Do not use the `codex-computer-use` skill");
+    assert.include(fleet, "/agent-fleet");
+    assert.include(visualOutputInstructions("catches"), "hosted Claude artifact");
   });
 });

@@ -95,6 +95,7 @@ import { ACP_SESSION_MODE_OPTION_ID } from "../../provider/acp/AcpSessionConfig.
 import * as AcpSessionRuntime from "../../provider/acp/AcpSessionRuntime.ts";
 import {
   t3AcpPromptWithInstructions,
+  t3WorkspaceContextFromTurn,
   type T3AcpInstructionState,
 } from "../../provider/T3OrchestrationInstructions.ts";
 import { buildRuntimeInstructions } from "../../provider/RuntimeInstructions.ts";
@@ -6736,6 +6737,7 @@ export function makeAcpAdapterV2(
           const text = t3AcpPromptWithInstructions({
             prompt: messageText,
             state: instructionState,
+            workspace: t3WorkspaceContextFromTurn(turnInput),
             ...(previousInstructionState === undefined
               ? {}
               : { previousState: previousInstructionState }),

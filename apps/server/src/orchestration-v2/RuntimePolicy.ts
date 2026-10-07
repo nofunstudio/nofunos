@@ -103,35 +103,30 @@ export const layerFromProjectStore: Layer.Layer<
           instance === undefined
             ? undefined
             : (yield* instance.snapshot.getSnapshot).supportedRuntimeModes;
+        const resolveError = (cause: unknown) =>
+          new RuntimePolicyResolveError({
+            projectId: input.thread.projectId,
+            providerInstanceId: input.modelSelection.instanceId,
+            cause,
+          });
+        // A worktree thread runs without its project's checkout, so a missing
+        // project only matters (and only fails) when it supplies the cwd.
+        const lookup = projects.get(input.thread.projectId).pipe(Effect.mapError(resolveError));
+        const project = yield* input.thread.worktreePath === null
+          ? lookup
+          : lookup.pipe(Effect.catch(() => Effect.succeed(Option.none<ProjectStore.ProjectRow>())));
         const cwd =
           input.thread.worktreePath ??
-          (yield* projects.get(input.thread.projectId).pipe(
-            Effect.mapError(
-              (cause) =>
-                new RuntimePolicyResolveError({
-                  projectId: input.thread.projectId,
-                  providerInstanceId: input.modelSelection.instanceId,
-                  cause,
-                }),
-            ),
-            Effect.flatMap(
-              Option.match({
-                onNone: () =>
-                  Effect.fail(
-                    new RuntimePolicyResolveError({
-                      projectId: input.thread.projectId,
-                      providerInstanceId: input.modelSelection.instanceId,
-                      cause: "Project not found.",
-                    }),
-                  ),
-                onSome: (project) => Effect.succeed(project.workspaceRoot),
-              }),
-            ),
-          ));
+          (Option.isSome(project)
+            ? project.value.workspaceRoot
+            : yield* Effect.fail(resolveError("Project not found.")));
         return ProviderAdapterV2RuntimePolicy.make({
           runtimeMode: providerRuntimeMode(input.thread.runtimeMode, supportedRuntimeModes),
           interactionMode: input.thread.interactionMode,
           cwd,
+          ...(Option.isSome(project)
+            ? { project: { name: project.value.title, root: project.value.workspaceRoot } }
+            : {}),
         });
       }),
     });

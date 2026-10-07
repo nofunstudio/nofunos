@@ -29,19 +29,72 @@ export function visualOutputInstructions(personaId: string | undefined): string 
   return GENERIC_VISUALS;
 }
 
-const NOFUN_FLEET = `### Fleet
+const CLAUDE_CODE_DEFAULTS = `Work the way Claude Code does by default: handle ordinary requests directly and pick up skills (~/.claude/skills) on your own, because the user never names a skill. The only name they use is "/agent-fleet" (also "use subagents"): read \`orchestrator_capabilities\` for status, then split the work`;
 
-Handle ordinary requests the way Claude Code would; the user needs no special phrasing, and you delegate only when the task benefits. "/agent-fleet" and "use subagents" mean: read \`orchestrator_capabilities\` for status, then split the work across the personal Claude, Codex and Muse routes above. Muse only through \`muse_task_start\`.`;
+const NOFUN_FLEET = `### Fleet and computer use
 
-const CATCHES_FLEET = `### Fleet
+${CLAUDE_CODE_DEFAULTS} across the personal Claude, Codex and Muse routes above. Muse only through \`muse_task_start\`.
 
-Handle ordinary requests the way Claude Code would; the user needs no special phrasing, and you delegate only when the task benefits. "/agent-fleet" and "use subagents" mean: read \`orchestrator_capabilities\` for status, then split the work only across the CATCHES Claude instances (A/B) and the CATCHES Codex instance listed there. Never use Muse, Cursor or any personal account here, and do not guess a route: if one is not listed, report it unavailable.`;
+Computer use is always Codex's job, and the user will not ask for it: anything that drives a GUI outside the in-app browser (native apps, desktop-app QA, system dialogs) goes to Codex Computer Use. As Claude, load the \`codex-computer-use\` skill, or \`delegate_task\` to the Codex instance in \`orchestrator_capabilities\` with a computer-use packet (goal, app, stop condition, one GUI owner); other providers delegate the same way. Never drive such a GUI with your own computer-use tools, and verify Codex's result yourself.`;
 
-function fleetInstructions(personaId: string | undefined): string {
+const CATCHES_FLEET = `### Fleet and computer use
+
+${CLAUDE_CODE_DEFAULTS} only across the CATCHES Claude instances (A/B) and the CATCHES Codex instance listed there. Never use Muse, Cursor or any personal account here, and do not guess a route: if one is not listed, report it unavailable.
+
+Computer use is always the CATCHES Codex instance's job, and the user will not ask for it: anything that drives a GUI outside the in-app browser (native apps, desktop-app QA, system dialogs) is \`delegate_task\` to that instance with a computer-use packet (goal, app, stop condition, one GUI owner), then you verify the result. Do not use the \`codex-computer-use\` skill (it targets the personal Codex account) or your own computer-use tools. If the CATCHES Codex instance has no computer-use tool, say so and name what is missing instead of falling back.`;
+
+export function fleetInstructions(personaId: string | undefined): string {
   return personaId === "catches" ? CATCHES_FLEET : NOFUN_FLEET;
 }
 
-export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = `
+/** What T3 knows about where a turn runs; every field is optional so older call sites keep working. */
+export interface T3WorkspaceContext {
+  readonly projectName?: string | undefined;
+  /** The project's own checkout. */
+  readonly projectRoot?: string | null | undefined;
+  /** The thread's worktree, when it has one. */
+  readonly worktreePath?: string | null | undefined;
+  readonly branch?: string | null | undefined;
+  readonly cwd?: string | null | undefined;
+}
+
+/** The turn-shaped inputs every adapter already holds, reduced to what the instructions name. */
+export function t3WorkspaceContextFromTurn(turn: {
+  readonly appThread: {
+    readonly branch: string | null;
+    readonly worktreePath: string | null;
+  };
+  readonly runtimePolicy: {
+    readonly cwd: string | null;
+    readonly project?: { readonly name: string; readonly root: string } | undefined;
+  };
+}): T3WorkspaceContext {
+  return {
+    projectName: turn.runtimePolicy.project?.name,
+    projectRoot: turn.runtimePolicy.project?.root,
+    worktreePath: turn.appThread.worktreePath,
+    branch: turn.appThread.branch,
+    cwd: turn.runtimePolicy.cwd,
+  };
+}
+
+const NOFUN_TEAM = "No Fun";
+
+/** Team and project for the turn, so "which team or project am I in" needs no tool call. */
+export function t3WorkspaceInstructions(
+  context: T3WorkspaceContext,
+  persona: ReturnType<typeof readNofunPersonaScope> = readNofunPersonaScope(),
+): string {
+  const lines = [`- Team: ${persona?.info.label ?? NOFUN_TEAM}`];
+  if (context.projectName) lines.push(`- Project: ${context.projectName}`);
+  if (context.projectRoot) lines.push(`- Project root: ${context.projectRoot}`);
+  if (context.worktreePath) lines.push(`- Thread worktree: ${context.worktreePath}`);
+  else if (context.cwd) lines.push(`- Working directory: ${context.cwd} (the project checkout)`);
+  if (context.branch) lines.push(`- Branch: ${context.branch}`);
+  return `### Where you are\n\n${lines.join("\n")}\n\nThis is the team and project this thread belongs to; answer questions about them from here.`;
+}
+
+const buildOrchestrationInstructions = (workspace: string | undefined): string => `
 
 ## T3 Code orchestration
 
@@ -75,7 +128,16 @@ ACP fallback: some ACP agents accept the injected MCP server but fail to expose 
 
 ${fleetInstructions(readNofunPersonaScope()?.info.id)}
 
-${visualOutputInstructions(readNofunPersonaScope()?.info.id)}`;
+${visualOutputInstructions(readNofunPersonaScope()?.info.id)}${workspace === undefined ? "" : `\n\n${workspace}`}`;
+
+export const T3_CODE_ORCHESTRATION_INSTRUCTIONS = buildOrchestrationInstructions(undefined);
+
+/** The orchestration text for one turn, with its team and project spelled out. */
+export function t3OrchestrationInstructionsFor(context: T3WorkspaceContext | undefined): string {
+  return context === undefined
+    ? T3_CODE_ORCHESTRATION_INSTRUCTIONS
+    : buildOrchestrationInstructions(t3WorkspaceInstructions(context));
+}
 
 export const T3_CODE_BROWSER_TOOL_INSTRUCTIONS = `
 
@@ -109,6 +171,7 @@ export function t3AcpPromptWithInstructions(input: {
   readonly prompt: string;
   readonly state: T3AcpInstructionState;
   readonly previousState?: T3AcpInstructionState;
+  readonly workspace?: T3WorkspaceContext;
 }): string {
   // Native slash commands must remain at the start of the prompt.
   if (input.prompt.trimStart().startsWith("/")) return input.prompt;
@@ -123,7 +186,10 @@ export function t3AcpPromptWithInstructions(input: {
       ? T3_CODE_ACP_PLAN_MODE_INSTRUCTIONS
       : T3_CODE_ACP_DEFAULT_MODE_INSTRUCTIONS,
     ...(input.state.hasT3Mcp
-      ? [T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(), T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim()]
+      ? [
+          T3_CODE_BROWSER_TOOL_INSTRUCTIONS.trim(),
+          t3OrchestrationInstructionsFor(input.workspace).trim(),
+        ]
       : []),
   ];
   return `<t3_code_instructions>\n${instructions.join("\n\n")}\n</t3_code_instructions>\n\n<user_request>\n${input.prompt}\n</user_request>`;
@@ -134,20 +200,27 @@ export function t3AcpPromptWithInstructions(input: {
  * context in the first prompt. Keep the wrapper explicit so it cannot be
  * mistaken for text authored by the user.
  */
-function prependT3OrchestrationInstructions(prompt: string): string {
-  return `<t3_code_orchestration_instructions>${T3_CODE_ORCHESTRATION_INSTRUCTIONS.trim()}</t3_code_orchestration_instructions>\n\n<user_request>\n${prompt}\n</user_request>`;
+function prependT3OrchestrationInstructions(
+  prompt: string,
+  workspace: T3WorkspaceContext | undefined,
+): string {
+  return `<t3_code_orchestration_instructions>${t3OrchestrationInstructionsFor(workspace).trim()}</t3_code_orchestration_instructions>\n\n<user_request>\n${prompt}\n</user_request>`;
 }
 
 export function t3OrchestrationPromptForFirstRun(input: {
   readonly prompt: string;
   readonly runOrdinal: number;
   readonly hasT3Mcp: boolean;
+  readonly workspace?: T3WorkspaceContext;
 }): string {
   return input.runOrdinal === 1 && input.hasT3Mcp
-    ? prependT3OrchestrationInstructions(input.prompt)
+    ? prependT3OrchestrationInstructions(input.prompt, input.workspace)
     : input.prompt;
 }
 
-export function t3OrchestrationSystemPrompt(hasT3Mcp: boolean): string | undefined {
-  return hasT3Mcp ? T3_CODE_ORCHESTRATION_INSTRUCTIONS : undefined;
+export function t3OrchestrationSystemPrompt(
+  hasT3Mcp: boolean,
+  workspace?: T3WorkspaceContext,
+): string | undefined {
+  return hasT3Mcp ? t3OrchestrationInstructionsFor(workspace) : undefined;
 }
