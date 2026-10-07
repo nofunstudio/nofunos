@@ -33,6 +33,7 @@ import {
 import { FleetAvatar } from "./FleetAvatar";
 import { PHASE_LABEL, type FleetPhase } from "./fleetModel";
 import { useMuseJobLog } from "./museJobs";
+import type { BackgroundRow } from "./backgroundModel";
 
 const EMPTY_PROVIDERS: ReadonlyArray<ServerProvider> = [];
 const noop = () => {};
@@ -229,5 +230,52 @@ export function MuseJobLogView(props: {
         )}
       </div>
     </>
+  );
+}
+
+export function formatAgo(iso: string): string {
+  const seconds = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000));
+  if (seconds < 60) return `${seconds}s ago`;
+  const minutes = Math.floor(seconds / 60);
+  return minutes < 60 ? `${minutes}m ago` : `${Math.floor(minutes / 60)}h ago`;
+}
+
+/** A background task's latest output; the projection pushes updates while it runs. */
+export function BackgroundOutputView(props: { readonly row: BackgroundRow | null }) {
+  const { row } = props;
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const node = scrollRef.current;
+    if (node) node.scrollTop = node.scrollHeight;
+  }, [row?.output]);
+  return (
+    <div
+      ref={scrollRef}
+      className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3"
+      data-fleet-bg-output
+    >
+      {row === null ? (
+        <p className="text-xs text-muted-foreground">This task has finished.</p>
+      ) : (
+        <>
+          {row.command && row.command !== row.label ? (
+            <p className="mb-2 break-words font-mono text-2xs text-muted-foreground">
+              $ {row.command}
+            </p>
+          ) : null}
+          {row.output ? (
+            <pre className="m-0 whitespace-pre-wrap break-words font-mono text-2xs leading-relaxed text-foreground/80">
+              {row.output.join("\n")}
+            </pre>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              {row.outputOmitted
+                ? "Output is not loaded here. Open the full thread to read it."
+                : "No output yet."}
+            </p>
+          )}
+        </>
+      )}
+    </div>
   );
 }

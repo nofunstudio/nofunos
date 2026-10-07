@@ -56,6 +56,11 @@ import {
   type FleetRow,
 } from "./fleetModel";
 import { useMuseJobs } from "./museJobs";
+import { backgroundRow } from "./fleetModel";
+import { backgroundKindLabel } from "./backgroundModel";
+import { formatAgo } from "./FleetAgentView";
+import { useBackgroundRows } from "./useBackgroundRows";
+import { BackgroundOutputView } from "./FleetAgentView";
 
 const MAX_DEPTH = 3;
 const NO_PROVIDERS: ReadonlyArray<ServerProvider> = [];
@@ -109,7 +114,7 @@ function FleetRowView(props: {
               "shrink-0 text-2xs",
               row.phase === "failed"
                 ? "text-destructive-foreground"
-                : row.phase === "waiting"
+                : row.phase === "waiting" || row.phase === "quiet"
                   ? "text-warning-foreground"
                   : "text-muted-foreground",
             )}
@@ -214,6 +219,14 @@ function SubagentBranch(props: {
 
 type MuseJobs = ReturnType<typeof useMuseJobs>;
 
+function SectionLabel(props: { readonly children: string }) {
+  return (
+    <div className="px-2 pt-2 pb-0.5 text-2xs font-medium text-muted-foreground/70">
+      {props.children}
+    </div>
+  );
+}
+
 function FleetList(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
@@ -237,7 +250,9 @@ function FleetList(props: {
         DateTime.toEpochMillis(a.completedAt ?? a.updatedAt),
     );
   const museRows = useMemo(() => splitFleetRows(muse.jobs.map(museRow)), [muse.jobs]);
-  const activeCount = activeAgents.length + museRows.active.length;
+  const background = useBackgroundRows(ref);
+  const backgroundRows = useMemo(() => background.map(backgroundRow), [background]);
+  const activeCount = activeAgents.length + museRows.active.length + backgroundRows.length;
   const doneCount = doneAgents.length + museRows.settled.length;
 
   const setFocus = useFleetFocusStore((state) => state.setFocus);
@@ -265,6 +280,9 @@ function FleetList(props: {
           <p className="px-2 py-3 text-xs text-muted-foreground">
             No agents yet. They show up here when this thread delegates work.
           </p>
+        ) : null}
+        {backgroundRows.length > 0 && activeCount - backgroundRows.length + doneCount > 0 ? (
+          <SectionLabel>Agents</SectionLabel>
         ) : null}
         {activeAgents.map((agent) => branch(agent, true))}
         {museRows.active.map((row) => (
@@ -303,6 +321,19 @@ function FleetList(props: {
             ) : null}
           </div>
         ) : null}
+        {backgroundRows.length > 0 ? (
+          <>
+            <SectionLabel>Background</SectionLabel>
+            {backgroundRows.map((row) => (
+              <FleetRowView
+                key={row.key}
+                row={row}
+                onOpen={() => setFocus(ref, { kind: "background", taskId: row.key })}
+                onStop={null}
+              />
+            ))}
+          </>
+        ) : null}
       </div>
     </>
   );
@@ -334,6 +365,32 @@ function threadAgentHeader(input: {
     phase,
     detail: describeAgent([driverName(driver), model, effort]),
   };
+}
+
+function BackgroundDetail(props: {
+  readonly threadRef: ReturnType<typeof scopeThreadRef>;
+  readonly taskId: string;
+  readonly onBack: () => void;
+}) {
+  const rows = useBackgroundRows(props.threadRef);
+  const row = rows.find((candidate) => candidate.taskId === props.taskId);
+  const fleet = row ? backgroundRow(row) : null;
+  const header: AgentHeader = {
+    title: row?.label ?? "Background task",
+    driver: "background",
+    phase: fleet?.phase ?? "done",
+    detail: describeAgent([
+      "This thread",
+      row ? backgroundKindLabel(row.kind) : null,
+      row?.lastActivityAt ? `last activity ${formatAgo(row.lastActivityAt)}` : null,
+    ]),
+  };
+  return (
+    <>
+      <AgentViewHeader header={header} onBack={props.onBack} />
+      <BackgroundOutputView row={row ?? null} />
+    </>
+  );
 }
 
 function FleetDetail(props: {
@@ -371,6 +428,10 @@ function FleetDetail(props: {
         onBack={back}
       />
     );
+  }
+
+  if (focus.kind === "background") {
+    return <BackgroundDetail threadRef={ref} taskId={focus.taskId} onBack={back} />;
   }
 
   const childId = focus.threadId as ThreadId;

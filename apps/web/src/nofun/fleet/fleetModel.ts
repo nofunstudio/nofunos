@@ -10,9 +10,18 @@ import {
 } from "@t3tools/shared/model";
 
 import { getProviderModelCapabilities } from "../../providerModels";
+import { backgroundKindLabel, type BackgroundRow } from "./backgroundModel";
 
-export type FleetSource = "t3" | "native" | "muse";
-export type FleetPhase = "queued" | "running" | "waiting" | "done" | "failed" | "stopped";
+export type FleetSource = "t3" | "native" | "muse" | "background";
+export type FleetPhase =
+  | "queued"
+  | "running"
+  /** Background work with no output for a while. */
+  | "quiet"
+  | "waiting"
+  | "done"
+  | "failed"
+  | "stopped";
 
 export interface FleetRow {
   readonly key: string;
@@ -78,6 +87,7 @@ const PHASE_BY_STATUS: Record<OrchestrationV2Subagent["status"], FleetPhase> = {
 export const PHASE_LABEL: Record<FleetPhase, string> = {
   queued: "Queued",
   running: "Working",
+  quiet: "No output",
   waiting: "Needs input",
   done: "Done",
   failed: "Failed",
@@ -92,6 +102,7 @@ export function phaseRelationshipStatus(phase: FleetPhase): string {
     case "running":
       return "running";
     case "waiting":
+    case "quiet":
       return "waiting";
     case "done":
       return "completed";
@@ -103,7 +114,7 @@ export function phaseRelationshipStatus(phase: FleetPhase): string {
 }
 
 export function isActivePhase(phase: FleetPhase): boolean {
-  return phase === "queued" || phase === "running" || phase === "waiting";
+  return phase === "queued" || phase === "running" || phase === "quiet" || phase === "waiting";
 }
 
 const DRIVER_NAMES: Record<string, string> = {
@@ -209,6 +220,27 @@ export function museRow(job: MuseJobSummary): FleetRow {
     completedAt: job.finishedAt,
     childThreadId: null,
     museJobId: job.jobId,
+    depth: 0,
+  };
+}
+
+export function backgroundRow(row: BackgroundRow): FleetRow {
+  const phase: FleetPhase = row.quiet ? "quiet" : "running";
+  return {
+    key: row.taskId,
+    source: "background",
+    driver: "background",
+    title: row.label,
+    origin: `This thread · ${backgroundKindLabel(row.kind)}`,
+    model: null,
+    effort: null,
+    tokens: null,
+    phase,
+    active: true,
+    startedAt: row.startedAt,
+    completedAt: null,
+    childThreadId: null,
+    museJobId: null,
     depth: 0,
   };
 }
