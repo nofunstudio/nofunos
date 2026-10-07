@@ -1,5 +1,5 @@
 import type { EnvironmentId, ScopedThreadRef } from "@t3tools/contracts";
-import { Plus, X } from "lucide-react";
+import { X } from "lucide-react";
 import {
   type PointerEvent as ReactPointerEvent,
   useCallback,
@@ -12,7 +12,9 @@ import {
 
 import { stackedThreadToast, toastManager } from "~/components/ui/toast";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
+import { confirmTerminalClose } from "~/lib/terminalCloseConfirm";
 import { cn, randomUUID } from "~/lib/utils";
+import { useThreadShell } from "~/state/entities";
 import type { TerminalContextSelection } from "~/lib/terminalContext";
 import { readWarpAccess, warpRequest, WarpRequestError } from "./access.ts";
 import { buildWarpTerminalContext } from "./askContext.ts";
@@ -31,8 +33,9 @@ import {
   type WarpActionOutcome,
 } from "./registry.ts";
 import { createRunAdmission } from "./runAdmission.ts";
+import { useBusyWarpTerminalIds } from "./runningShells.ts";
+import { pathBasename, TeamProjectLine } from "./TeamProjectLine.tsx";
 
-const SESSION_LABELS = ["Development", "Tests", "Scratch"];
 const ACTION_ACK_TIMEOUT_MS = 8_000;
 const MIN_HEIGHT = 180;
 const MAX_HEIGHT_RATIO = 0.75;
@@ -94,6 +97,8 @@ export interface WarpThreadTerminalPanelProps {
   readonly layout?: "drawer" | "panel";
   readonly cwd: string;
   readonly worktreePath: string | null | undefined;
+  /** The thread's project root; `cwd` is its worktree when it has one. */
+  readonly projectRoot?: string | null | undefined;
   readonly visible: boolean;
   readonly height: number;
   readonly focusRequestId: number;
@@ -113,6 +118,7 @@ export function WarpThreadTerminalPanel({
   layout = "drawer",
   cwd,
   worktreePath,
+  projectRoot,
   visible,
   height,
   focusRequestId,
@@ -121,6 +127,12 @@ export function WarpThreadTerminalPanel({
 }: WarpThreadTerminalPanelProps) {
   const environmentId: EnvironmentId = threadRef.environmentId;
   const threadId = threadRef.threadId;
+  const branch = useThreadShell(threadRef)?.branch ?? null;
+  const busyTerminalIds = useBusyWarpTerminalIds(environmentId, threadId);
+  const busyTerminalIdsRef = useRef(busyTerminalIds);
+  useEffect(() => {
+    busyTerminalIdsRef.current = busyTerminalIds;
+  }, [busyTerminalIds]);
   const threadKey = `${environmentId}:${threadId}`;
   const registryKey = surfaceId ? `${threadKey}#${surfaceId}` : threadKey;
   const surfaceQuery = surfaceId ? `&surface=${encodeURIComponent(surfaceId)}` : "";
@@ -133,7 +145,6 @@ export function WarpThreadTerminalPanel({
   const activePaneRef = useRef<string | null>(null);
   const [serverSessions, setServerSessions] = useState<ReadonlyArray<ServerSession>>([]);
   const boundPanesRef = useRef(new Set<string>());
-  const labelCountRef = useRef(0);
   // v2 guest state. A guest that never advertises `protocols` is v1: no "+", no re-attach.
   const [guestV2, setGuestV2] = useState(false);
   const guestV2Ref = useRef(false);
@@ -237,9 +248,15 @@ export function WarpThreadTerminalPanel({
     [bundleOrigin],
   );
 
+  /** The lowest "Shell N" no open, pending or restored shell of this surface already has. */
   const nextLabel = useCallback(() => {
-    const index = labelCountRef.current++;
-    return SESSION_LABELS[index] ?? `Session ${index + 1}`;
+    const taken = new Set<string>();
+    for (const pane of panesRef.current.values()) taken.add(pane.label);
+    for (const pending of pendingOpensRef.current.values()) taken.add(pending.label);
+    for (const label of hostOpenedPanesRef.current.values()) taken.add(label);
+    let index = 1;
+    while (taken.has(`Shell ${index}`)) index += 1;
+    return `Shell ${index}`;
   }, []);
 
   const closeSession = async (terminalId: string, options?: { readonly quiet?: boolean }) => {
@@ -304,6 +321,7 @@ export function WarpThreadTerminalPanel({
         terminalId: input.terminalId,
         cwd,
         worktreePath: worktreePath ?? null,
+        projectRoot: projectRoot ?? null,
         label: input.label,
         reattach: input.reattach,
         ...(surfaceId ? { surface: surfaceId } : {}),
@@ -351,8 +369,7 @@ export function WarpThreadTerminalPanel({
   const reopenSessions = async (sessions: ReadonlyArray<ServerSession>, generation: number) => {
     for (const session of sessions) {
       if (generationRef.current !== generation) return;
-      const fresh = nextLabel(); // keeps later default names from repeating a restored one
-      const label = session.label ?? fresh;
+      const label = session.label ?? nextLabel();
       try {
         const minted = await mintSession({
           terminalId: session.terminalId,
@@ -412,8 +429,7 @@ export function WarpThreadTerminalPanel({
       reattachQueueRef.current = [];
       if (rest.length > 0) void reopenSessions(rest, generation);
     }
-    const fresh = nextLabel();
-    const label = revived?.label ?? hostOpenedPanesRef.current.get(paneId) ?? fresh;
+    const label = revived?.label ?? hostOpenedPanesRef.current.get(paneId) ?? nextLabel();
     const terminalId = revived?.terminalId ?? randomTerminalId();
     addPane(paneId, terminalId, label);
     try {
@@ -440,7 +456,6 @@ export function WarpThreadTerminalPanel({
         hostOpenedPanesRef.current.clear();
         pendingOpensRef.current.clear();
         requestPaneIdsRef.current.clear();
-        labelCountRef.current = 0;
         initialPaneHandledRef.current = false;
         reattachQueueRef.current = [];
         reattachPlanRef.current = null;
@@ -696,6 +711,27 @@ export function WarpThreadTerminalPanel({
     [bundleOrigin, openSessionAndWait, postToGuest, resolveTarget, sendAction],
   );
 
+  const openShell = useCallback((): boolean => {
+    if (!guestV2Ref.current || !guestReadyRef.current) return false;
+    openNewPane();
+    return true;
+  }, [openNewPane]);
+
+  const closeActive = async (): Promise<boolean> => {
+    const pane = activePaneRef.current ? panesRef.current.get(activePaneRef.current) : undefined;
+    if (!pane) return false;
+    if (busyTerminalIdsRef.current.has(pane.terminalId)) {
+      const confirmed = await confirmTerminalClose([pane.label]);
+      if (!confirmed) return true;
+    }
+    closePane(pane);
+    return true;
+  };
+  const closeActiveRef = useRef(closeActive);
+  useEffect(() => {
+    closeActiveRef.current = closeActive;
+  });
+
   useEffect(
     () =>
       registerWarpPanel(registryKey, {
@@ -706,8 +742,10 @@ export function WarpThreadTerminalPanel({
         canOpenSession: () => guestV2Ref.current && guestReadyRef.current,
         run: (text) => act("run", text),
         insert: (text) => act("insert", text),
+        openShell,
+        closeActive: () => closeActiveRef.current(),
       }),
-    [act, resolveTarget, registryKey],
+    [act, openShell, resolveTarget, registryKey],
   );
 
   useEffect(() => {
@@ -747,11 +785,6 @@ export function WarpThreadTerminalPanel({
     onHeightChange(drawerHeight);
   };
 
-  const openFromToolbar = () => {
-    if (!guestReadyRef.current) return;
-    openNewPane();
-  };
-
   const setupMessage =
     bundle.state === "missing"
       ? bundle.message
@@ -768,7 +801,8 @@ export function WarpThreadTerminalPanel({
   return (
     <aside
       data-thread-terminal-drawer
-      data-terminal-owner="warp"
+      data-terminal-owner={isPanel ? "right-panel" : "drawer"}
+      data-terminal-renderer="warp"
       data-warp-layout={layout}
       className={cn(
         "relative flex min-w-0 flex-col overflow-hidden bg-background",
@@ -786,103 +820,91 @@ export function WarpThreadTerminalPanel({
         />
       )}
       <div
-        className="flex h-7 shrink-0 items-center gap-1.5 border-b border-border/70 px-2 text-xs"
+        className="flex h-7 shrink-0 items-center gap-2 border-b border-border/70 px-2 text-xs"
         data-warp-toolbar
       >
-        <span className="rounded bg-muted px-1.5 py-0.5 text-3xs font-medium text-muted-foreground">
-          Warp (experimental)
-        </span>
-        <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
-          {[...panes.values()].map((pane) => (
-            <div
-              key={pane.paneId}
-              data-warp-session={pane.label}
-              data-warp-terminal-id={pane.terminalId}
-              data-warp-state={pane.state}
-              className={cn(
-                "flex h-5 shrink-0 items-center gap-1 rounded-md pr-0.5 pl-1.5",
-                pane.paneId === activePane?.paneId
-                  ? "bg-accent text-foreground"
-                  : "text-muted-foreground hover:bg-accent/60",
-              )}
-            >
-              <span className={cn("size-1.5 rounded-full", STATE_DOT[pane.state])} />
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      type="button"
-                      className="cursor-pointer"
-                      onClick={() => {
-                        setActivePane(pane.paneId);
-                        postToGuest({ type: "focus", paneId: pane.paneId });
-                      }}
-                    />
-                  }
+        <TeamProjectLine
+          environmentId={environmentId}
+          projectName={pathBasename(projectRoot ?? cwd)}
+          branch={branch}
+        />
+        {/* A v2 guest draws its own tab strip (cwd titles, +, close), which is the one tab model.
+            Only a v1 guest has no tabs of its own, so only then does T3 list its shells. */}
+        {guestV2 ? null : (
+          <div className="ml-auto flex min-w-0 items-center gap-1 overflow-x-auto">
+            {[...panes.values()].map((pane) => (
+              <div
+                key={pane.paneId}
+                data-warp-session={pane.label}
+                data-warp-terminal-id={pane.terminalId}
+                data-warp-state={pane.state}
+                className={cn(
+                  "flex h-5 shrink-0 items-center gap-1 rounded-md pr-0.5 pl-1.5",
+                  pane.paneId === activePane?.paneId
+                    ? "bg-accent text-foreground"
+                    : "text-muted-foreground hover:bg-accent/60",
+                )}
+              >
+                <span className={cn("size-1.5 rounded-full", STATE_DOT[pane.state])} />
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        className="cursor-pointer"
+                        onClick={() => {
+                          setActivePane(pane.paneId);
+                          postToGuest({ type: "focus", paneId: pane.paneId });
+                        }}
+                      />
+                    }
+                  >
+                    {pane.label}
+                    {pane.state === "exited"
+                      ? ` (exited${pane.exitCode === null ? "" : ` ${pane.exitCode}`})`
+                      : ""}
+                  </TooltipTrigger>
+                  <TooltipPopup side="top">
+                    {pane.message ?? `${pane.label}: ${pane.state}`}
+                  </TooltipPopup>
+                </Tooltip>
+                <button
+                  type="button"
+                  className="cursor-pointer rounded p-0.5 hover:bg-accent"
+                  aria-label={`Close ${pane.label}`}
+                  onClick={() => closePane(pane)}
                 >
-                  {pane.label}
-                  {pane.state === "exited"
-                    ? ` (exited${pane.exitCode === null ? "" : ` ${pane.exitCode}`})`
-                    : ""}
-                </TooltipTrigger>
-                <TooltipPopup side="top">
-                  {pane.message ?? `${pane.label}: ${pane.state}`}
-                </TooltipPopup>
-              </Tooltip>
-              <button
-                type="button"
-                className="cursor-pointer rounded p-0.5 hover:bg-accent"
-                aria-label={`Close ${pane.label}`}
-                onClick={() => closePane(pane)}
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+            {detached.map((session) => (
+              <div
+                key={session.terminalId}
+                data-warp-detached={session.terminalId}
+                className="flex h-5 shrink-0 items-center gap-1 rounded-md pr-0.5 pl-1.5 text-muted-foreground"
               >
-                <X className="size-3" />
-              </button>
-            </div>
-          ))}
-          {guestV2 ? (
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    data-warp-new-session
-                    className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
-                    aria-label="New Warp shell"
-                    onClick={openFromToolbar}
-                  />
-                }
-              >
-                <Plus className="size-3" />
-              </TooltipTrigger>
-              <TooltipPopup side="top">New Warp shell</TooltipPopup>
-            </Tooltip>
-          ) : null}
-          {detached.map((session) => (
-            <div
-              key={session.terminalId}
-              data-warp-detached={session.terminalId}
-              className="flex h-5 shrink-0 items-center gap-1 rounded-md pr-0.5 pl-1.5 text-muted-foreground"
-            >
-              <span className="size-1.5 rounded-full bg-warning" />
-              <Tooltip>
-                <TooltipTrigger render={<span />}>
-                  Detached shell {session.generation ?? ""}
-                </TooltipTrigger>
-                <TooltipPopup side="top">
-                  Still running, but Warp cannot reattach a shell after a reload or a closed pane.
-                </TooltipPopup>
-              </Tooltip>
-              <button
-                type="button"
-                className="cursor-pointer rounded p-0.5 hover:bg-accent"
-                aria-label="Close detached shell"
-                onClick={() => void closeSession(session.terminalId)}
-              >
-                <X className="size-3" />
-              </button>
-            </div>
-          ))}
-        </div>
+                <span className="size-1.5 rounded-full bg-warning" />
+                <Tooltip>
+                  <TooltipTrigger render={<span />}>
+                    Detached shell {session.generation ?? ""}
+                  </TooltipTrigger>
+                  <TooltipPopup side="top">
+                    Still running, but Warp cannot reattach a shell after a reload or a closed pane.
+                  </TooltipPopup>
+                </Tooltip>
+                <button
+                  type="button"
+                  className="cursor-pointer rounded p-0.5 hover:bg-accent"
+                  aria-label="Close detached shell"
+                  onClick={() => void closeSession(session.terminalId)}
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="relative min-h-0 flex-1 bg-black">
         {iframeSrc ? (

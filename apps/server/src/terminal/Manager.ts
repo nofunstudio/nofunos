@@ -77,6 +77,7 @@ import * as ProcessRunner from "../processRunner.ts";
 import * as PortScanner from "../preview/PortScanner.ts";
 import * as NativeTelemetryClient from "../resourceTelemetry/NativeTelemetryClient.ts";
 import * as PtyAdapter from "./PtyAdapter.ts";
+import { terminalContextEnv } from "./contextEnv.ts";
 
 export {
   TerminalCwdError,
@@ -2245,7 +2246,20 @@ export const makeWithOptions = Effect.fn("TerminalManager.makeWithOptions")(func
               platform,
               baseEnv,
             );
-            const terminalEnv = createTerminalSpawnEnv(baseEnv, session.runtimeEnv, platform);
+            const terminalEnv = createTerminalSpawnEnv(
+              baseEnv,
+              {
+                ...terminalContextEnv({
+                  threadId: session.threadId,
+                  cwd: session.cwd,
+                  worktreePath: session.worktreePath,
+                  runtimeEnv: session.runtimeEnv,
+                  serverEnv: baseEnv,
+                }),
+                ...session.runtimeEnv,
+              },
+              platform,
+            );
             // Append (never prepend) managed ACP agent install directories so
             // `kimi login` and friends resolve by name without shadowing any
             // system or user tool of the same name.

@@ -2109,6 +2109,31 @@ it.layer(
     }),
   );
 
+  it.effect("exports team, project and thread context to every shell", () =>
+    Effect.gen(function* () {
+      const { manager, ptyAdapter } = yield* createManager(5, {
+        env: { T3CODE_PERSONA: "catches", T3CODE_PERSONA_LABEL: "CATCHES" },
+      });
+      yield* manager.open(
+        openInput({
+          worktreePath: "/work/.wt/shop-feature",
+          env: {
+            T3CODE_PROJECT_ROOT: "/work/shop",
+            T3CODE_WORKTREE_PATH: "/work/.wt/shop-feature",
+          },
+        }),
+      );
+      const spawnEnv = ptyAdapter.spawnInputs[0]?.env;
+      assert.equal(spawnEnv?.NOFUN_TEAM, "catches");
+      assert.equal(spawnEnv?.T3_PROJECT_NAME, "shop");
+      assert.equal(spawnEnv?.T3_PROJECT_ROOT, "/work/shop");
+      assert.equal(spawnEnv?.T3_WORKTREE_PATH, "/work/.wt/shop-feature");
+      assert.equal(spawnEnv?.T3_THREAD_ID, "thread-1");
+      // The persona scope itself stays server-only.
+      assert.equal(spawnEnv?.T3CODE_PERSONA, undefined);
+    }),
+  );
+
   it.effect("injects runtime env overrides into spawned terminals", () =>
     Effect.gen(function* () {
       const { manager, ptyAdapter } = yield* createManager(5, { env: { FORCE_COLOR: "3" } });

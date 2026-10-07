@@ -1737,6 +1737,7 @@ export default function ThreadTerminalDrawer(props: ThreadTerminalDrawerProps) {
         layout={isPanel ? "panel" : "drawer"}
         cwd={props.cwd}
         worktreePath={props.worktreePath}
+        projectRoot={props.runtimeEnv?.T3CODE_PROJECT_ROOT}
         visible={props.visible ?? true}
         height={clampDrawerHeight(props.height)}
         focusRequestId={props.focusRequestId}

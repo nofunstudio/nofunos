@@ -7976,6 +7976,8 @@ export default function ChatView(props: ChatViewProps) {
       if (command === "terminal.split") {
         event.preventDefault();
         event.stopPropagation();
+        // Warp owns its own splits; a Ghostty split here would spawn a shell nothing shows.
+        if (terminalRenderer === "warp") return;
         if (terminalFocusOwner === "right-panel") {
           splitPanelTerminal();
           return;
@@ -7990,6 +7992,7 @@ export default function ChatView(props: ChatViewProps) {
       if (command === "terminal.splitVertical") {
         event.preventDefault();
         event.stopPropagation();
+        if (terminalRenderer === "warp") return;
         if (terminalFocusOwner === "right-panel") {
           splitPanelTerminal("vertical");
           return;
@@ -8004,6 +8007,13 @@ export default function ChatView(props: ChatViewProps) {
       if (command === "terminal.close") {
         event.preventDefault();
         event.stopPropagation();
+        if (terminalRenderer === "warp") {
+          const warpPanel = activeThreadId
+            ? getRunnableWarpPanel(`${environmentId}:${activeThreadId}`)
+            : undefined;
+          if (warpPanel && !event.repeat) void warpPanel.closeActive();
+          return;
+        }
         if (terminalFocusOwner === "right-panel" && activeRightPanelSurface?.kind === "terminal") {
           requestClosePanelTerminal(activeRightPanelSurface.activeTerminalId);
           return;
@@ -8016,6 +8026,17 @@ export default function ChatView(props: ChatViewProps) {
       if (command === "terminal.new") {
         event.preventDefault();
         event.stopPropagation();
+        if (terminalRenderer === "warp") {
+          if (event.repeat || !activeThreadId) return;
+          if (!terminalUiState.terminalOpen) setTerminalOpen(true);
+          const warpKey = `${environmentId}:${activeThreadId}`;
+          void (async () => {
+            const panel =
+              getRunnableWarpPanel(warpKey) ?? (await waitForRunnableWarpPanel(warpKey, 8_000));
+            panel?.openShell();
+          })();
+          return;
+        }
         if (terminalFocusOwner === "right-panel") {
           addTerminalSurface();
           return;
@@ -8138,6 +8159,7 @@ export default function ChatView(props: ChatViewProps) {
     requestClosePanelTerminal,
     createNewTerminal,
     setTerminalOpen,
+    terminalRenderer,
     runProjectScript,
     splitTerminal,
     splitPanelTerminal,
