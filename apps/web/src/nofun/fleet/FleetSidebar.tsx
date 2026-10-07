@@ -250,11 +250,8 @@ export function FleetSidebar(props: {
 
   return (
     <div className="flex h-full min-h-0 flex-col" data-nofun-fleet-sidebar>
-      <div className="flex min-h-9 items-center justify-between gap-2 px-3.5">
-        <h2 className="text-xs font-medium text-muted-foreground select-none">Agents</h2>
-        <span className="text-2xs text-muted-foreground tabular-nums">
-          {activeCount > 0 ? `${activeCount} active` : null}
-        </span>
+      <div className="flex min-h-8 items-center px-3.5 text-2xs text-muted-foreground tabular-nums">
+        {activeCount > 0 ? `${activeCount} active` : "\u00a0"}
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-3">
         {activeCount === 0 && doneCount === 0 ? (
