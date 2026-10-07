@@ -24,7 +24,12 @@ import {
   canDetachThreadProviderSession,
   resolveLatestMergeBackRun,
 } from "@t3tools/client-runtime/state/thread-workflows";
-import type { EnvironmentId, OrchestrationV2ThreadShell, ThreadId } from "@t3tools/contracts";
+import type {
+  EnvironmentId,
+  OrchestrationV2ThreadShell,
+  ProviderDriverKind,
+  ThreadId,
+} from "@t3tools/contracts";
 import { groupBy } from "effect/Array";
 import * as DateTime from "effect/DateTime";
 import { useNavigate } from "@tanstack/react-router";
@@ -36,6 +41,7 @@ import {
   LoaderCircleIcon,
   MoreHorizontalIcon,
   PlusIcon,
+  SparklesIcon,
   UnplugIcon,
 } from "lucide-react";
 import { useMemo, useState, type ReactNode } from "react";
@@ -111,18 +117,17 @@ export function ThreadLineageRowList(props: {
   );
 }
 
-function ThreadLineageGroup(props: {
+function ThreadLineageGroup<Row>(props: {
   readonly label: string | null;
-  readonly rows: ReadonlyArray<ThreadRelationshipWalkRow>;
+  readonly rows: ReadonlyArray<Row>;
   readonly expanded: boolean;
-  readonly children: (rows: ReadonlyArray<ThreadRelationshipWalkRow>) => ReactNode;
+  readonly isFailed: (row: Row) => boolean;
+  readonly children: (rows: ReadonlyArray<Row>) => ReactNode;
 }) {
   const [expanded, setExpanded] = useState(props.expanded);
   const [visibleCount, setVisibleCount] = useState(THREAD_LINEAGE_INITIAL_COUNT);
   const { visibleRows, hiddenCount } = resolveThreadLineageWindow(props.rows, visibleCount);
-  const failedCount = props.rows.filter(
-    ({ edge }) => edge.status === "failed" || edge.status === "error",
-  ).length;
+  const failedCount = props.rows.filter(props.isFailed).length;
   if (props.rows.length === 0) return null;
   return (
     <div>
@@ -190,10 +195,87 @@ function liveSubagent<Agent extends RuntimeSubagent>(
   };
 }
 
+/**
+ * An agent with no thread of its own (an external Muse job, a provider-native
+ * subagent): listed beside the child threads, in the same row style.
+ */
+export interface ThreadAgentExtraRow {
+  readonly key: string;
+  readonly title: string;
+  readonly driver?: ProviderDriverKind | undefined;
+  /** Relationship status vocabulary: running, pending, waiting, completed, failed, cancelled. */
+  readonly status: string;
+  readonly startedAt: string | null;
+  readonly completedAt: string | null;
+  readonly active: boolean;
+  readonly onOpen: (() => void) | null;
+}
+
+type PanelRow =
+  | { readonly type: "edge"; readonly row: ThreadRelationshipWalkRow }
+  | { readonly type: "extra"; readonly extra: ThreadAgentExtraRow };
+
+const isFailedPanelRow = (item: PanelRow) =>
+  item.type === "extra"
+    ? item.extra.status === "failed"
+    : item.row.edge.status === "failed" || item.row.edge.status === "error";
+
+function ExtraAgentRow(props: { readonly extra: ThreadAgentExtraRow }) {
+  const { extra } = props;
+  return (
+    <li className="group flex h-8 items-center rounded-lg">
+      <ThreadDetailsControl
+        size="sm"
+        variant="ghost"
+        part="row"
+        disabled={extra.onOpen === null}
+        onClick={extra.onOpen ?? undefined}
+      >
+        <ThreadRelationshipIcon
+          driver={extra.driver}
+          fallbackIcon={SparklesIcon}
+          status={extra.status}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-left text-sm font-medium leading-4 text-foreground/85">
+            {extra.title}
+          </span>
+        </span>
+        {extra.startedAt ? (
+          <span className="shrink-0 text-2xs font-normal tabular-nums text-muted-foreground">
+            <AgentElapsed
+              agent={{
+                status: extra.active ? "running" : "completed",
+                startedAt: extra.startedAt,
+                completedAt: extra.completedAt,
+              }}
+            />
+          </span>
+        ) : null}
+        <span className="shrink-0 text-2xs text-muted-foreground">
+          {threadRelationshipStatusLabel(extra.status)}
+        </span>
+      </ThreadDetailsControl>
+    </li>
+  );
+}
+
+/**
+ * The thread's related threads and its agents, as two views of one row list.
+ * `lineage` keeps forks, parents and context transfers; `agents` keeps delegated
+ * child threads plus `extraAgents`; `all` shows everything together.
+ */
 export function ThreadRelationshipsPanel(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
+  readonly view?: "all" | "lineage" | "agents";
+  readonly extraAgents?: ReadonlyArray<ThreadAgentExtraRow>;
+  /** Replaces opening the child thread in the chat when an agent row is clicked. */
+  readonly onOpenAgent?: (threadId: ThreadId) => void;
+  /** Heading actions of the `agents` view, in place of the disconnect menu. */
+  readonly agentsActions?: ReactNode;
 }) {
+  const view = props.view ?? "all";
   const ref = scopeThreadRef(props.environmentId, props.threadId);
   const projection = useThreadProjection(ref)?.projection ?? null;
   const providers = useServerConfigs().get(props.environmentId)?.providers;
@@ -263,22 +345,59 @@ export function ThreadRelationshipsPanel(props: {
       ? "previous"
       : "active";
   });
-  const groups = [
-    { id: "related", label: null, rows: related, expanded: true },
-    { id: "active", label: null, rows: active, expanded: true },
-    { id: "previous", label: "Previous agents", rows: previous, expanded: false },
+  const extras = props.extraAgents ?? [];
+  const edgeRows = (rows: ReadonlyArray<ThreadRelationshipWalkRow>): PanelRow[] =>
+    rows.map((row) => ({ type: "edge", row }));
+  const extraRows = (rows: ReadonlyArray<ThreadAgentExtraRow>): PanelRow[] =>
+    rows.map((row) => ({ type: "extra", extra: row }));
+  const showRelated = view !== "agents";
+  const showAgents = view !== "lineage";
+  const activeRows = showAgents
+    ? [...edgeRows(active), ...extraRows(extras.filter((row) => row.active))]
+    : [];
+  const previousRows = showAgents
+    ? [...edgeRows(previous), ...extraRows(extras.filter((row) => !row.active))]
+    : [];
+  const groups: ReadonlyArray<{
+    readonly id: string;
+    readonly label: string | null;
+    readonly rows: ReadonlyArray<PanelRow>;
+    readonly expanded: boolean;
+  }> = [
+    { id: "related", label: null, rows: showRelated ? edgeRows(related) : [], expanded: true },
+    { id: "active", label: null, rows: activeRows, expanded: true },
+    {
+      id: "previous",
+      label: view === "agents" ? "Done" : "Previous agents",
+      rows: previousRows,
+      expanded: view === "agents" && activeRows.length === 0,
+    },
   ];
-  // Subagents without a child thread yet have no row, so count them separately.
-  const runningCount =
-    (projection?.subagents.filter(
-      (agent) => agent.childThreadId === null && agent.status === "running",
-    ).length ?? 0) + active.filter(({ edge }) => edge.status === "running").length;
+  // Provider-native subagents without a child thread have no relationship row;
+  // the `agents` view receives them as extras, the `all` view counts them here.
+  const runningCount = showAgents
+    ? (view === "all"
+        ? (projection?.subagents.filter(
+            (agent) => agent.childThreadId === null && agent.status === "running",
+          ).length ?? 0)
+        : 0) +
+      active.filter(({ edge }) => edge.status === "running").length +
+      extras.filter((row) => row.active).length
+    : 0;
+  const visibleRowCount = groups.reduce((total, group) => total + group.rows.length, 0);
 
-  if (relationshipRows.length === 0 && runningCount === 0) {
+  if (visibleRowCount === 0 && runningCount === 0) {
     return null;
   }
 
   const openThread = (threadId: ThreadId) => {
+    if (props.onOpenAgent) {
+      const edgeRow = relationshipRows.find((row) => row.threadId === threadId)?.edge;
+      if (edgeRow?.kind === "subagent" && !isParentThreadRelationship(edgeRow, props.threadId)) {
+        props.onOpenAgent(threadId);
+        return;
+      }
+    }
     void navigate({
       to: "/$environmentId/$threadId",
       params: buildThreadRouteParams(scopeThreadRef(props.environmentId, threadId)),
@@ -315,41 +434,70 @@ export function ThreadRelationshipsPanel(props: {
       ? null
       : (graph.nodes.get(mergeTargetThreadId)?.thread?.title ?? null);
 
+  // One owner for the disconnect menu: the lineage section when it has rows,
+  // otherwise the agents section, so the thread never loses it.
+  const showDetach = canDetach && (view !== "agents" || related.length === 0);
+  const detachMenu = (
+    <Menu>
+      <MenuTrigger
+        render={
+          <ThreadDetailsControl
+            size="icon-xs"
+            variant="ghost"
+            part="icon"
+            aria-label="More thread actions"
+            disabled={busyAction !== null}
+          />
+        }
+      >
+        <MoreHorizontalIcon className="size-3.5" />
+      </MenuTrigger>
+      <MenuPopup align="end" className="min-w-60 max-w-(--available-width)">
+        <MenuItem onClick={() => void detach()}>
+          <UnplugIcon className="size-3.5" />
+          Disconnect agent session
+        </MenuItem>
+      </MenuPopup>
+    </Menu>
+  );
+
   return (
     <ThreadDetailsSection
       headingId="thread-details-lineage-heading"
-      title={runningCount > 0 ? `Lineage · ${runningCount} running` : "Lineage"}
+      title={
+        view === "agents"
+          ? runningCount > 0
+            ? `Agents · ${runningCount} active`
+            : "Agents"
+          : runningCount > 0
+            ? `Lineage · ${runningCount} running`
+            : "Lineage"
+      }
       data-thread-relationships-panel
+      {...(view === "agents" ? { "data-nofun-fleet-panel": true } : {})}
       actions={
-        canDetach ? (
-          <Menu>
-            <MenuTrigger
-              render={
-                <ThreadDetailsControl
-                  size="icon-xs"
-                  variant="ghost"
-                  part="icon"
-                  aria-label="More thread actions"
-                  disabled={busyAction !== null}
-                />
-              }
-            >
-              <MoreHorizontalIcon className="size-3.5" />
-            </MenuTrigger>
-            <MenuPopup align="end" className="min-w-60 max-w-(--available-width)">
-              <MenuItem onClick={() => void detach()}>
-                <UnplugIcon className="size-3.5" />
-                Disconnect agent session
-              </MenuItem>
-            </MenuPopup>
-          </Menu>
+        view === "agents" ? (
+          <>
+            {props.agentsActions}
+            {showDetach ? detachMenu : null}
+          </>
+        ) : showDetach ? (
+          detachMenu
         ) : null
       }
     >
       {groups.map((group) => (
-        <ThreadLineageGroup key={`${scopedThreadKey(ref)}:${group.id}`} {...group}>
+        <ThreadLineageGroup
+          key={`${scopedThreadKey(ref)}:${group.id}`}
+          {...group}
+          isFailed={isFailedPanelRow}
+        >
           {(visibleRows) =>
-            visibleRows.map(({ threadId, edge }) => {
+            visibleRows.map((item) => {
+              if (item.type === "extra") {
+                return <ExtraAgentRow key={item.extra.key} extra={item.extra} />;
+              }
+              const { threadId, edge } = item.row;
               const node = graph.nodes.get(threadId);
               const isSubagent = edge.kind === "subagent";
               const isMergeTarget = threadId === mergeTargetThreadId;

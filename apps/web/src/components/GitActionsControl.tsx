@@ -1785,7 +1785,36 @@ export default function GitActionsControl({
             {initAction.isPending ? "Initializing..." : "Initialize Git"}
           </span>
         </ThreadDetailsControl>
-      ) : compact && !gitActionProgress && !visibleInlineSuccess ? null : (
+      ) : compact && !gitActionProgress && !visibleInlineSuccess ? null : isPanel &&
+        quickAction.kind === "open_publish" &&
+        !gitActionProgress &&
+        !visibleInlineSuccess ? (
+        // The panel does not lead with "Publish repository"; it stays one click
+        // away, inside this menu's Git actions list.
+        <Menu
+          onOpenChange={(open) => {
+            if (open) requestVcsStatusRefresh(refreshVcsStatus, activeEnvironmentId, gitCwd);
+          }}
+        >
+          <MenuTrigger
+            render={
+              <ThreadDetailsControl
+                aria-label="Git actions"
+                size="sm"
+                variant="ghost"
+                part="row"
+                panel
+              />
+            }
+            disabled={isGitActionRunning}
+          >
+            <SourceControlIcon className={THREAD_DETAILS_PANEL_ICON_CLASS} aria-hidden />
+            <span className="flex-1 truncate text-left">Git actions</span>
+            <ChevronDownIcon aria-hidden="true" className={THREAD_DETAILS_PANEL_CHEVRON_CLASS} />
+          </MenuTrigger>
+          <MenuPopup align="end">{gitItems}</MenuPopup>
+        </Menu>
+      ) : (
         <ActionGroup
           role="group"
           aria-label="Git actions"

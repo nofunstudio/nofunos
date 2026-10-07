@@ -1,6 +1,7 @@
 /**
  * Muse jobs for the Fleet sidebar. Muse is an external worker, not a thread, so
- * its jobs are not in the orchestration projection; the sidebar reads them here.
+ * its jobs are not in the orchestration projection; the sidebar reads them here
+ * (the list, one job's log tail, cancel).
  * Thin transport: each route decodes input and calls one bridge method.
  */
 import { AuthOrchestrationOperateScope } from "@t3tools/contracts";
@@ -35,6 +36,21 @@ const makeHandler = (bridge: MuseWorkerBridge.MuseWorkerBridge["Service"]) =>
       return jobs === null ? json({ error: "list_failed" }, 500) : json({ jobs });
     }
 
+    if (route === "/log" && request.method === "GET") {
+      const jobId = url.value.searchParams.get("jobId") ?? "";
+      if (jobId.length === 0) return json({ error: "bad_request" }, 400);
+      const view = yield* bridge.jobStatus(jobId).pipe(Effect.catch(() => Effect.succeed(null)));
+      return view === null
+        ? json({ error: "not_found" }, 404)
+        : json({
+            jobId: view.jobId,
+            status: view.status,
+            note: view.note,
+            tail: view.tail,
+            stderrTail: view.stderrTail,
+          });
+    }
+
     if (route === "/cancel" && request.method === "POST") {
       const body = yield* request.json.pipe(
         Effect.flatMap(Schema.decodeUnknownEffect(CancelRequest)),
@@ -55,6 +71,7 @@ export const routeLayer = HttpRouter.use((router) =>
     const bridge = yield* MuseWorkerBridge.MuseWorkerBridge;
     const handler = makeHandler(bridge);
     yield* router.add("GET", MUSE_ROUTE_PREFIX, handler);
+    yield* router.add("GET", `${MUSE_ROUTE_PREFIX}/log`, handler);
     yield* router.add("POST", `${MUSE_ROUTE_PREFIX}/cancel`, handler);
   }),
 );

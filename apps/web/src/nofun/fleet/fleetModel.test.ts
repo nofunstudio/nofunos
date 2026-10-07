@@ -8,6 +8,7 @@ import {
   splitFleetRows,
   subagentRow,
   type MuseJobSummary,
+  phaseRelationshipStatus,
 } from "./fleetModel";
 
 const agent = (overrides: Record<string, unknown> = {}) =>
@@ -174,5 +175,15 @@ describe("defaultEffortFor", () => {
   it("returns null for an unknown instance or model", () => {
     expect(defaultEffortFor(providers, "codex", "claude-haiku-4-5")).toBeNull();
     expect(defaultEffortFor(providers, "claudeAgent", null)).toBeNull();
+  });
+});
+
+describe("phaseRelationshipStatus", () => {
+  it("speaks the details panel's status words", () => {
+    expect(
+      (["queued", "running", "waiting", "done", "failed", "stopped"] as const).map(
+        phaseRelationshipStatus,
+      ),
+    ).toEqual(["pending", "running", "waiting", "completed", "failed", "cancelled"]);
   });
 });

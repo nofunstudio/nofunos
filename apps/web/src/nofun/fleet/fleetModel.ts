@@ -84,6 +84,24 @@ export const PHASE_LABEL: Record<FleetPhase, string> = {
   stopped: "Stopped",
 };
 
+/** The thread-relationship status words the details panel's agent rows speak. */
+export function phaseRelationshipStatus(phase: FleetPhase): string {
+  switch (phase) {
+    case "queued":
+      return "pending";
+    case "running":
+      return "running";
+    case "waiting":
+      return "waiting";
+    case "done":
+      return "completed";
+    case "failed":
+      return "failed";
+    case "stopped":
+      return "cancelled";
+  }
+}
+
 export function isActivePhase(phase: FleetPhase): boolean {
   return phase === "queued" || phase === "running" || phase === "waiting";
 }
@@ -117,6 +135,14 @@ export interface SubagentRowInput {
   readonly depth: number;
   readonly startedAt: string | null;
   readonly completedAt: string | null;
+}
+
+export function subagentRowPhase(status: OrchestrationV2Subagent["status"]): {
+  readonly phase: FleetPhase;
+  readonly active: boolean;
+} {
+  const phase = PHASE_BY_STATUS[status];
+  return { phase, active: isActivePhase(phase) };
 }
 
 export function subagentRow(input: SubagentRowInput): FleetRow {
