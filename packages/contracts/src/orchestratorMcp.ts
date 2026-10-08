@@ -494,6 +494,17 @@ export const OrchestratorMcpProviderCapability = Schema.Struct({
   canRunChildTask: Schema.Boolean,
   canRunCrossProviderChildTask: Schema.Boolean,
   constraints: Schema.Array(Schema.String),
+  /**
+   * Live subscription headroom, so routing can spare a nearly spent pool:
+   * `low` keeps it for work only it can do, `exhausted` skips it until reset.
+   * Optional so clients can decode responses from older servers.
+   */
+  usage: Schema.optional(
+    Schema.Struct({
+      headroom: Schema.Literals(["ok", "low", "exhausted", "unknown"]),
+      summary: Schema.String,
+    }),
+  ),
 });
 export type OrchestratorMcpProviderCapability = typeof OrchestratorMcpProviderCapability.Type;
 

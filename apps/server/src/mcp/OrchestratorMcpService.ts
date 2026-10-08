@@ -65,11 +65,14 @@ import * as Duration from "effect/Duration";
 import * as Effect from "effect/Effect";
 import * as Exit from "effect/Exit";
 import * as Layer from "effect/Layer";
+import * as Clock from "effect/Clock";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
 import * as Stream from "effect/Stream";
 
 import * as ProviderAdapterRegistry from "../orchestration-v2/ProviderAdapterRegistry.ts";
+import * as MuseUsage from "../nofun/MuseUsage.ts";
+import { usageHeadroom } from "./usageHeadroom.ts";
 import * as IdAllocator from "../orchestration-v2/IdAllocator.ts";
 import {
   subagentResultForRun,
@@ -1795,6 +1798,17 @@ const make = Effect.gen(function* () {
         const providers = yield* loadProviders;
         const orchestrationCapableInstanceIds = yield* loadOrchestrationCapableInstanceIds();
         const worktreeService = yield* Effect.serviceOption(GitWorkflowService.GitWorkflowService);
+        // Muse accounts report quota through the No Fun usage service, keyed
+        // `muse:<account id>`, which is also their provider instance id.
+        const museUsage = yield* Effect.serviceOption(MuseUsage.MuseUsage);
+        const museLimits = new Map(
+          (Option.isSome(museUsage) ? yield* museUsage.value.current : []).flatMap((source) =>
+            source.accounts[0]
+              ? [[source.id.replace(/^muse:/, ""), source.accounts[0].usageLimits]]
+              : [],
+          ),
+        );
+        const nowMs = yield* Clock.currentTimeMillis;
         return {
           parentThreadId: parent?.thread.id ?? null,
           inheritedProviderInstanceId: parent?.thread.modelSelection.instanceId ?? null,
@@ -1821,6 +1835,10 @@ const make = Effect.gen(function* () {
               canRunChildTask: constraints.length === 0,
               canRunCrossProviderChildTask: constraints.length === 0,
               constraints: [...constraints],
+              usage: usageHeadroom(
+                provider.usageLimits ?? museLimits.get(String(provider.instanceId)),
+                nowMs,
+              ),
             };
           }),
           features: {
