@@ -58,6 +58,7 @@ const handlers = {
           profile: input.profile,
           requestId: input.requestId,
           threadId: thread.threadId,
+          ...(input.account !== undefined ? { account: input.account } : {}),
         })
         .pipe(
           Effect.catchTags({

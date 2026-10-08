@@ -32,6 +32,10 @@ const MuseTaskStartTool = Tool.make("muse_task_start", {
       description:
         "Caller-chosen idempotency key ([a-zA-Z0-9._-], max 128 chars). Reuse it across retries of the same delegation.",
     }),
+    account: Schema.optional(Schema.String).annotate({
+      description:
+        "Muse subscription id to run on (for example muse-personal or muse-backstage-support). Omit to let the pool pick the account with the most five-hour room; spread independent tasks by omitting it. An explicit account never falls back to another one.",
+    }),
   }),
   success: Schema.Struct({
     jobId: Schema.String,
@@ -63,6 +67,7 @@ const MuseTaskStatusTool = Tool.make("muse_task_status", {
     model: Schema.String,
     exitCode: Schema.NullOr(Schema.Int),
     note: Schema.NullOr(Schema.String),
+    account: Schema.NullOr(Schema.String),
     tail: Schema.Array(Schema.String),
     stderrTail: Schema.Array(Schema.String),
   }),

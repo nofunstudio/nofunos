@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vite-plus/test";
 
 import {
+  museChildEnvironment,
   museSourceSnapshot,
   museUsageWindows,
   pickMuseAccount,
+  type MuseAccount,
   type MuseAccountState,
   type MuseSubscriptionUsage,
 } from "./museUsage.logic.ts";
@@ -14,27 +16,66 @@ const usage = (window: number, weekly: number): MuseSubscriptionUsage => ({
   observedAtMs: 500,
 });
 
-const state = (label: string, reading: MuseSubscriptionUsage | null): MuseAccountState => ({
-  account: { label },
+const account = (id: string, expectedEmail?: string): MuseAccount => ({
+  id,
+  label: id,
+  ...(expectedEmail ? { expectedEmail } : {}),
+});
+
+const state = (
+  id: string,
+  reading: MuseSubscriptionUsage | null,
+  extra: Partial<MuseAccountState> = {},
+): MuseAccountState => ({
+  account: account(id),
+  signedInAs: null,
   usage: reading,
   error: null,
   checkedAtMs: 500,
+  ...extra,
 });
 
+const picked = (pick: ReturnType<typeof pickMuseAccount>) =>
+  pick?._tag === "Account" ? pick.account.id : pick;
+
 describe("pickMuseAccount", () => {
-  it("routes to the subscription with the most five-hour room", () => {
-    const pick = pickMuseAccount([state("Muse", usage(80, 10)), state("Muse 2", usage(20, 90))]);
-    expect(pick).toEqual({ _tag: "Account", account: { label: "Muse 2" } });
+  it("routes pool work to the subscription with the most five-hour room", () => {
+    expect(picked(pickMuseAccount([state("a", usage(80, 10)), state("b", usage(20, 90))]))).toBe(
+      "b",
+    );
   });
 
-  it("skips a subscription that is out of weekly quota", () => {
-    const pick = pickMuseAccount([state("Muse", usage(90, 40)), state("Muse 2", usage(5, 100))]);
-    expect(pick).toEqual({ _tag: "Account", account: { label: "Muse" } });
+  it("schedules fresh work on the other account when one is limited", () => {
+    expect(picked(pickMuseAccount([state("a", usage(100, 40)), state("b", usage(60, 10))]))).toBe(
+      "b",
+    );
+  });
+
+  it("refuses an explicit account that is limited rather than moving the work", () => {
+    expect(pickMuseAccount([state("a", usage(100, 40)), state("b", usage(5, 5))], "a")).toEqual({
+      _tag: "AllLimited",
+      resetsAtMs: 1_000_000,
+    });
+  });
+
+  it("refuses an unknown explicit account", () => {
+    expect(pickMuseAccount([state("a", usage(5, 5))], "zzz")).toEqual({
+      _tag: "Unknown",
+      id: "zzz",
+    });
+  });
+
+  it("never runs an account signed in as someone else", () => {
+    const wrong = state("a", usage(0, 0), {
+      account: account("a", "me@example.com"),
+      signedInAs: "other@example.com",
+    });
+    expect(picked(pickMuseAccount([wrong, state("b", usage(50, 50))]))).toBe("b");
+    expect(pickMuseAccount([wrong])).toEqual({ _tag: "Unknown", id: "a verified Muse account" });
   });
 
   it("still runs on an account it could not read rather than blocking work", () => {
-    const pick = pickMuseAccount([state("Muse", usage(100, 40)), state("Muse 2", null)]);
-    expect(pick).toEqual({ _tag: "Account", account: { label: "Muse 2" } });
+    expect(picked(pickMuseAccount([state("a", usage(100, 40)), state("b", null)]))).toBe("b");
   });
 
   it("names the earliest reset when every subscription is spent", () => {
@@ -42,8 +83,24 @@ describe("pickMuseAccount", () => {
       ...usage(10, 100),
       weekly: { usedPercent: 100, resetsAtMs: 400_000 },
     };
-    const pick = pickMuseAccount([state("Muse", usage(100, 40)), state("Muse 2", spentWeekly)]);
-    expect(pick).toEqual({ _tag: "AllLimited", resetsAtMs: 400_000 });
+    expect(pickMuseAccount([state("a", usage(100, 40)), state("b", spentWeekly)])).toEqual({
+      _tag: "AllLimited",
+      resetsAtMs: 400_000,
+    });
+  });
+});
+
+describe("museChildEnvironment", () => {
+  it("refuses the route when META_API_KEY is set instead of stripping it", () => {
+    expect(museChildEnvironment(account("a"), { META_API_KEY: "x" })).toHaveProperty("refused");
+  });
+
+  it("drops inherited account routing and applies the account's own roots", () => {
+    const result = museChildEnvironment(
+      { ...account("a"), configHome: "/c", dataHome: "/d" },
+      { PATH: "/bin", MUSE_AUTH_PATH: "/other/auth.json", TBH_CREDENTIAL_BACKEND: "file" },
+    );
+    expect(result).toEqual({ env: { PATH: "/bin", XDG_CONFIG_HOME: "/c", XDG_DATA_HOME: "/d" } });
   });
 });
 
@@ -58,8 +115,8 @@ describe("museUsageWindows", () => {
 
 describe("museSourceSnapshot", () => {
   it("keeps a failing subscription visible with its error", () => {
-    const snapshot = museSourceSnapshot({ ...state("Muse 2", null), error: "Not logged in." });
-    expect(snapshot).toMatchObject({ kind: "muse", label: "Muse 2", accounts: [] });
+    const snapshot = museSourceSnapshot({ ...state("b", null), error: "Not logged in." });
+    expect(snapshot).toMatchObject({ id: "muse:b", kind: "muse", accounts: [] });
     expect(snapshot.error).toBe("Not logged in.");
   });
 });

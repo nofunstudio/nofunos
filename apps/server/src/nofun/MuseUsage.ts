@@ -40,6 +40,7 @@ import {
   MuseAccountsFile,
   MuseSubscriptionUsage,
   museSourceSnapshot,
+  museChildEnvironment,
   pickMuseAccount,
   type MuseAccount,
   type MuseAccountState,
@@ -59,9 +60,10 @@ export class MuseUsage extends Context.Service<
     readonly streamChanges: Stream.Stream<ReadonlyArray<UsageLimitSourceSnapshot>>;
     /**
      * Refreshes stale readings, then names the subscription the next Muse job
-     * should use. `null` when no account is configured.
+     * should use: `accountId` when given, else the pool's best. `null` when
+     * no account is configured.
      */
-    readonly pickAccount: Effect.Effect<MusePick | null>;
+    readonly pickAccount: (accountId?: string) => Effect.Effect<MusePick | null>;
   }
 >()("t3/nofun/MuseUsage") {}
 
@@ -88,15 +90,16 @@ function uuidV7(nowMs: number): string {
  * `usage/changed`. The child is killed as soon as the reading lands, on
  * error, and on timeout; it never outlives the probe.
  */
-function probeOnce(account: MuseAccount, dataHome: string, nowMs: number) {
+function probeOnce(
+  account: MuseAccount,
+  env: Record<string, string>,
+  nowMs: number,
+  onIdentity: (email: string | null) => string | null,
+) {
   return Effect.callback<MuseSubscriptionUsage, string>((resume) => {
-    const child = NodeChildProcess.spawn("muse", ["serve"], {
+    const child = NodeChildProcess.spawn(account.cliExecutable ?? "muse", ["serve"], {
       stdio: ["pipe", "pipe", "ignore"],
-      env: {
-        ...process.env,
-        XDG_DATA_HOME: dataHome,
-        ...(account.authPath ? { MUSE_AUTH_PATH: account.authPath } : {}),
-      },
+      env,
     });
     let settled = false;
     const finish = (result: Effect.Effect<MuseSubscriptionUsage, string>) => {
@@ -119,7 +122,7 @@ function probeOnce(account: MuseAccount, dataHome: string, nowMs: number) {
           id?: number;
           method?: string;
           params?: unknown;
-          result?: { session?: { sessionId?: string } };
+          result?: { session?: { sessionId?: string }; label?: string };
           error?: { message?: string };
         };
         try {
@@ -133,6 +136,14 @@ function probeOnce(account: MuseAccount, dataHome: string, nowMs: number) {
         }
         if (message.id === 1) {
           send({ jsonrpc: "2.0", method: "initialized" });
+          send({ jsonrpc: "2.0", id: 4, method: "account/read", params: {} });
+        } else if (message.id === 4) {
+          // Identity first, from local login metadata: a wrong account never spends a turn.
+          const refusal = onIdentity(message.result?.label ?? null);
+          if (refusal) {
+            finish(Effect.fail(refusal));
+            return;
+          }
           send({
             jsonrpc: "2.0",
             id: 2,
@@ -163,7 +174,11 @@ function probeOnce(account: MuseAccount, dataHome: string, nowMs: number) {
       jsonrpc: "2.0",
       id: 1,
       method: "initialize",
-      params: { clientInfo: { name: "t3_usage_probe", version: "1" } },
+      // account/read is experimental in MSP v1.
+      params: {
+        clientInfo: { name: "t3_usage_probe", version: "1" },
+        capabilities: { experimentalApi: true },
+      },
     });
     return Effect.sync(() => finish(Effect.fail("Probe interrupted.")));
   }).pipe(
@@ -199,9 +214,15 @@ const make = Effect.gen(function* () {
     Effect.catch(() => Effect.succeed(NO_MUSE_ACCOUNTS)),
     Effect.map((file) =>
       file.persona === personaId
-        ? file.accounts.map((account) =>
-            account.authPath ? { ...account, authPath: expandHome(account.authPath) } : account,
-          )
+        ? file.accounts.map((account) => ({
+            ...account,
+            ...(account.cliExecutable ? { cliExecutable: expandHome(account.cliExecutable) } : {}),
+            ...(account.workerExecutable
+              ? { workerExecutable: expandHome(account.workerExecutable) }
+              : {}),
+            ...(account.configHome ? { configHome: expandHome(account.configHome) } : {}),
+            ...(account.dataHome ? { dataHome: expandHome(account.dataHome) } : {}),
+          }))
         : [],
     ),
   );
@@ -214,7 +235,7 @@ const make = Effect.gen(function* () {
     const now = yield* Clock.currentTimeMillis;
     const next: MuseAccountState[] = [];
     for (const account of accounts) {
-      const prior = previous.find((state) => state.account.label === account.label);
+      const prior = previous.find((state) => state.account.id === account.id);
       const fresh =
         prior?.checkedAtMs !== null &&
         prior?.checkedAtMs !== undefined &&
@@ -223,15 +244,29 @@ const make = Effect.gen(function* () {
         next.push({ ...prior, account });
         continue;
       }
-      const dataHome = path.join(probeRoot, account.label.replace(/[^a-zA-Z0-9_-]/g, "_"));
+      // Probe sessions go to a private data root; a launcher that pins its
+      // own roots keeps them in that account's data root instead.
+      const dataHome = path.join(probeRoot, account.id.replace(/[^a-zA-Z0-9_-]/g, "_"));
       yield* fileSystem.makeDirectory(dataHome, { recursive: true }).pipe(Effect.ignore);
-      const result = yield* probeOnce(account, dataHome, now).pipe(Effect.result);
+      let signedInAs: string | null = prior?.signedInAs ?? null;
+      const childEnv = museChildEnvironment(account, process.env, dataHome);
+      const result =
+        "refused" in childEnv
+          ? ({ _tag: "Failure", failure: childEnv.refused } as const)
+          : yield* probeOnce(account, childEnv.env, now, (email) => {
+              signedInAs = email;
+              const expected = account.expectedEmail?.toLowerCase();
+              return expected && email?.toLowerCase() !== expected
+                ? `Signed in as ${email ?? "nobody"}, expected ${account.expectedEmail}.`
+                : null;
+            }).pipe(Effect.result);
       const checkedAtMs = yield* Clock.currentTimeMillis;
       next.push(
         result._tag === "Success"
-          ? { account, usage: result.success, error: null, checkedAtMs }
+          ? { account, signedInAs, usage: result.success, error: null, checkedAtMs }
           : {
               account,
+              signedInAs,
               // Keep the last good bars and say the refresh failed.
               usage: prior?.usage ?? null,
               error: result.failure,
@@ -240,7 +275,7 @@ const make = Effect.gen(function* () {
       );
       if (result._tag === "Failure") {
         yield* Effect.logDebug("muse usage probe failed", {
-          account: account.label,
+          account: account.id,
           cause: result.failure,
         });
       }
@@ -263,7 +298,8 @@ const make = Effect.gen(function* () {
 
   return {
     current: snapshots,
-    pickAccount: refreshStale.pipe(Effect.map(pickMuseAccount)),
+    pickAccount: (accountId) =>
+      refreshStale.pipe(Effect.map((states) => pickMuseAccount(states, accountId))),
     get streamChanges() {
       return Stream.unwrap(
         Effect.gen(function* () {

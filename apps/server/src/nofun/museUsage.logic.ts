@@ -14,14 +14,56 @@ import * as Schema from "effect/Schema";
 
 const isoFromMs = (ms: number) => DateTime.formatIso(DateTime.makeUnsafe(ms));
 
-/** One Muse subscription. `authPath` is the login `muse login` wrote with `MUSE_AUTH_PATH`. */
+/**
+ * One Muse Code subscription. Each account has its own launchers and its own
+ * config and data roots, so sessions and credentials never share a home; the
+ * app never switches accounts by rewriting an auth file.
+ */
 export const MuseAccount = Schema.Struct({
-  /** Shown in the usage views and used as the cache key, e.g. `Muse 2`. */
+  /** Stable id stored on every job, e.g. `muse-personal`. */
+  id: Schema.String.check(Schema.isMinLength(1)),
+  /** Shown in the usage views, e.g. `Muse Personal`. */
   label: Schema.String.check(Schema.isMinLength(1)),
-  /** Omitted for the default login (`~/.config/muse/auth.json`). */
-  authPath: Schema.optional(Schema.String),
+  /** The login this account must resolve to; a different one is refused. */
+  expectedEmail: Schema.optional(Schema.String),
+  /** Plan as the account center names it, when known. */
+  plan: Schema.optional(Schema.String),
+  /** `muse` CLI or a per-account launcher that pins its own roots. */
+  cliExecutable: Schema.optional(Schema.String),
+  /** `muse-worker.sh` or a per-account wrapper accepting the same flags. */
+  workerExecutable: Schema.optional(Schema.String),
+  /** XDG roots for the owned child process; launchers may pin their own. */
+  configHome: Schema.optional(Schema.String),
+  dataHome: Schema.optional(Schema.String),
 });
 export type MuseAccount = typeof MuseAccount.Type;
+
+/**
+ * The environment for one account's child process, built from the server's.
+ * Account-routing variables are removed so the default lane keeps its
+ * Keychain login, and a set META_API_KEY refuses the route outright: these
+ * accounts run on the subscription and must never fall back to API billing.
+ */
+export function museChildEnvironment(
+  account: MuseAccount,
+  parent: Readonly<Record<string, string | undefined>>,
+  dataHomeOverride?: string,
+): { readonly env: Record<string, string> } | { readonly refused: string } {
+  if (parent.META_API_KEY?.trim()) {
+    return { refused: "META_API_KEY is set; Muse subscription routes refuse API billing." };
+  }
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(parent)) {
+    if (value === undefined) continue;
+    if (key === "MUSE_AUTH_PATH" || key === "TBH_CREDENTIAL_BACKEND" || key === "META_API_KEY")
+      continue;
+    env[key] = value;
+  }
+  if (account.configHome) env.XDG_CONFIG_HOME = account.configHome;
+  const dataHome = dataHomeOverride ?? account.dataHome;
+  if (dataHome) env.XDG_DATA_HOME = dataHome;
+  return { env };
+}
 
 /**
  * `~/.nofun-t3/muse-accounts.json`. Only the server whose persona matches
@@ -81,6 +123,8 @@ export function museUsageWindows(
 
 export interface MuseAccountState {
   readonly account: MuseAccount;
+  /** The login `account/read` reported; null until a check succeeds. */
+  readonly signedInAs: string | null;
   readonly usage: MuseSubscriptionUsage | null;
   readonly error: string | null;
   /** When the last probe finished, successful or not, epoch ms. */
@@ -91,7 +135,7 @@ export interface MuseAccountState {
 export function museSourceSnapshot(state: MuseAccountState): UsageLimitSourceSnapshot {
   const checkedAt = isoFromMs(state.usage?.observedAtMs ?? state.checkedAtMs ?? 0);
   const base = {
-    id: `muse:${state.account.label}` as UsageLimitSourceId,
+    id: `muse:${state.account.id}` as UsageLimitSourceId,
     kind: "muse" as const,
     label: state.account.label,
     checkedAt,
@@ -105,6 +149,7 @@ export function museSourceSnapshot(state: MuseAccountState): UsageLimitSourceSna
       {
         id: state.account.label,
         driver: ProviderDriverKind.make("muse"),
+        ...(state.account.plan ? { plan: state.account.plan } : {}),
         usageLimits: { checkedAt, windows: museUsageWindows(state.usage) },
       },
     ],
@@ -114,32 +159,51 @@ export function museSourceSnapshot(state: MuseAccountState): UsageLimitSourceSna
 
 export type MusePick =
   | { readonly _tag: "Account"; readonly account: MuseAccount }
-  | { readonly _tag: "AllLimited"; readonly resetsAtMs: number };
+  | { readonly _tag: "AllLimited"; readonly resetsAtMs: number }
+  | { readonly _tag: "Unknown"; readonly id: string };
+
+const isOpen = (state: MuseAccountState) =>
+  state.usage === null ||
+  (state.usage.window.usedPercent < 100 && state.usage.weekly.usedPercent < 100);
+
+const nextReset = (usage: MuseSubscriptionUsage) =>
+  usage.weekly.usedPercent >= 100 ? usage.weekly.resetsAtMs : usage.window.resetsAtMs;
 
 /**
- * The subscription with the most five-hour room that is not out of weekly
- * quota. Accounts never read successfully rank last but still run, so a
- * failing probe never blocks work. When every read account is spent, the
- * caller should route the work elsewhere until the earliest reset.
+ * Which subscription runs the next Muse job. An explicit `accountId` is
+ * honored or refused, never moved to another account. The pool picks the
+ * account with the most five-hour room that is not out of weekly quota;
+ * accounts never read successfully rank last but still run, so a failing
+ * check never blocks work. Accounts signed in as someone else never run.
+ * `null` when no account is configured.
  */
-export function pickMuseAccount(states: ReadonlyArray<MuseAccountState>): MusePick | null {
-  const known = states.filter((state) => state.usage !== null);
-  const open = known.filter(
-    (state) => state.usage!.window.usedPercent < 100 && state.usage!.weekly.usedPercent < 100,
+export function pickMuseAccount(
+  states: ReadonlyArray<MuseAccountState>,
+  accountId?: string,
+): MusePick | null {
+  const eligible = states.filter(
+    (state) =>
+      !state.account.expectedEmail ||
+      state.signedInAs === null ||
+      state.signedInAs.toLowerCase() === state.account.expectedEmail.toLowerCase(),
   );
-  const best = open.toSorted(
-    (a, b) => a.usage!.window.usedPercent - b.usage!.window.usedPercent,
-  )[0];
+  if (accountId !== undefined) {
+    const chosen = eligible.find((state) => state.account.id === accountId);
+    if (!chosen) return { _tag: "Unknown", id: accountId };
+    return isOpen(chosen)
+      ? { _tag: "Account", account: chosen.account }
+      : { _tag: "AllLimited", resetsAtMs: nextReset(chosen.usage!) };
+  }
+  if (states.length === 0) return null;
+  if (eligible.length === 0) return { _tag: "Unknown", id: "a verified Muse account" };
+  const open = eligible.filter(isOpen);
+  const best = open
+    .filter((state) => state.usage !== null)
+    .toSorted((a, b) => a.usage!.window.usedPercent - b.usage!.window.usedPercent)[0];
   if (best) return { _tag: "Account", account: best.account };
-  const unknown = states.find((state) => state.usage === null);
-  if (unknown) return { _tag: "Account", account: unknown.account };
-  if (known.length === 0) return null;
-  const resetsAtMs = Math.min(
-    ...known.map((state) =>
-      state.usage!.weekly.usedPercent >= 100
-        ? state.usage!.weekly.resetsAtMs
-        : state.usage!.window.resetsAtMs,
-    ),
-  );
-  return { _tag: "AllLimited", resetsAtMs };
+  if (open[0]) return { _tag: "Account", account: open[0].account };
+  return {
+    _tag: "AllLimited",
+    resetsAtMs: Math.min(...eligible.map((state) => nextReset(state.usage!))),
+  };
 }

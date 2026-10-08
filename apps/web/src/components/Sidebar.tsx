@@ -361,8 +361,8 @@ function terminalProcessLabel(count: number): string {
 }
 
 /**
- * Running subagents and background tasks of one thread, as two tiny icon and
- * count pills. Nothing is drawn for a thread with neither.
+ * Running subagents and background tasks of one thread, as tiny icon and count
+ * pills beside the card's time. Nothing is drawn for a thread with neither.
  */
 function SidebarThreadWorkCounts(props: { counts: ThreadWorkCounts }) {
   const { subagents, background } = props.counts;
@@ -370,7 +370,7 @@ function SidebarThreadWorkCounts(props: { counts: ThreadWorkCounts }) {
   return (
     <span
       data-testid="sidebar-thread-work-counts"
-      className="inline-flex shrink-0 items-center gap-2 tabular-nums"
+      className="ml-1.5 inline-flex shrink-0 items-center gap-2 tabular-nums"
     >
       {subagents > 0 ? (
         <span className="inline-flex items-center gap-0.5">
@@ -884,9 +884,6 @@ const SidebarDraftRow = memo(function SidebarDraftRow(props: {
         <div className="relative z-10 h-[4.875rem] px-(--sidebar-row-content-inset) py-(--sidebar-content-inset)">
           <div className="flex h-5 min-w-0 items-center gap-1.5">
             <SquarePenIcon aria-hidden className={draftPenClassName} />
-            {props.project ? (
-              <ProjectFavicon project={props.project} className="size-4 shrink-0" />
-            ) : null}
             <span className="min-w-0 flex-1 truncate text-xs font-medium text-secondary-label">
               {props.projectDisplayName}
             </span>
@@ -1939,9 +1936,6 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
           <div className="relative z-10 h-[4.875rem] px-(--sidebar-row-content-inset) py-(--sidebar-content-inset)">
             <div className="flex h-5 min-w-0 items-center gap-1.5">
               {draftIndicator}
-              {props.project ? (
-                <ProjectFavicon project={props.project} className="size-4 shrink-0" />
-              ) : null}
               {props.projectDisplayName ? (
                 <span
                   className={cn(
@@ -2033,6 +2027,7 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                     ) : (
                       threadTimeLabel(thread)
                     )}
+                    <SidebarThreadWorkCounts counts={workCounts} />
                   </span>
                   {props.settlementSupported || showSnoozeButton || hasUnsentDraft ? (
                     <span
@@ -2107,14 +2102,9 @@ const SidebarThreadRow = memo(function SidebarThreadRow(props: {
                 </span>
               ) : null}
             </div>
-            {/* Only drawn when there is something to say: counts, terminal, PR, diff or a remote machine. */}
-            {workCounts.subagents + workCounts.background > 0 ||
-            terminalStatusIcon ||
-            prBadge ||
-            diff ||
-            isRemote ? (
+            {/* Only drawn when there is something to say: terminal, PR, diff or a remote machine. */}
+            {terminalStatusIcon || prBadge || diff || isRemote ? (
               <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-secondary-label text-xs">
-                <SidebarThreadWorkCounts counts={workCounts} />
                 <span className="flex-1" />
                 {terminalStatusIcon}
                 {prBadge}

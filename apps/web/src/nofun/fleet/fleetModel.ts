@@ -188,6 +188,8 @@ export interface MuseJobSummary {
   readonly startedAt: string;
   readonly finishedAt: string | null;
   readonly note: string | null;
+  /** The Muse subscription id the job runs on; absent on older servers and jobs. */
+  readonly account?: string | null;
 }
 
 const MUSE_PHASE: Record<MuseJobSummary["status"], FleetPhase> = {
@@ -210,7 +212,7 @@ export function museRow(job: MuseJobSummary): FleetRow {
     source: "muse",
     driver: "muse",
     title: MUSE_PROFILE_TITLE[job.profile] ?? "Muse job",
-    origin: "External worker",
+    origin: job.account ? `External worker · ${job.account}` : "External worker",
     model: job.model,
     // Muse's wrapper fixes its reasoning level; the job record has none.
     effort: null,

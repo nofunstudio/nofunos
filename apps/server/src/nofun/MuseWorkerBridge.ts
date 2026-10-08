@@ -34,6 +34,7 @@ import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import * as ServerConfig from "../config.ts";
 import * as MuseUsage from "./MuseUsage.ts";
+import { museChildEnvironment } from "./museUsage.logic.ts";
 
 /** Profiles the controller may hand to the external worker. */
 export type MuseWorkerProfile = "muse-review" | "muse-focused" | "muse-build";
@@ -69,6 +70,8 @@ export class MuseWorkerInputError extends Schema.TaggedError<MuseWorkerInputErro
       "workspace_not_directory",
       "unknown_profile",
       "bad_request_id",
+      "unknown_account",
+      "api_billing_refused",
     ]),
   },
 ) {
@@ -131,6 +134,8 @@ const MuseJobRecord = Schema.Struct({
   resultPath: Schema.String,
   exitCode: Schema.NullOr(Schema.Int),
   note: Schema.NullOr(Schema.String),
+  /** The Muse subscription the job runs on; absent on jobs from before accounts. */
+  account: Schema.optional(Schema.String),
 });
 type MuseJobRecord = typeof MuseJobRecord.Type;
 const decodeJobRecord = Schema.decodeUnknownEffect(Schema.fromJsonString(MuseJobRecord));
@@ -151,6 +156,7 @@ interface MuseStatusView {
   readonly model: string;
   readonly exitCode: number | null;
   readonly note: string | null;
+  readonly account: string | null;
   readonly tail: ReadonlyArray<string>;
   readonly stderrTail: ReadonlyArray<string>;
 }
@@ -164,6 +170,7 @@ export interface MuseJobSummary {
   readonly startedAt: string;
   readonly finishedAt: string | null;
   readonly note: string | null;
+  readonly account: string | null;
 }
 
 interface MuseCancelResult {
@@ -181,6 +188,8 @@ export class MuseWorkerBridge extends Context.Service<
       readonly profile: MuseWorkerProfile;
       readonly requestId: string;
       readonly threadId: string;
+      /** A Muse account id; omitted to let the pool pick. */
+      readonly account?: string;
     }) => Effect.Effect<
       MuseStartResult,
       MuseWorkerInputError | MuseWorkerSpawnError | MuseWorkerIoError | MuseLimitReachedError
@@ -347,6 +356,7 @@ const make = Effect.gen(function* () {
     model: record.model,
     exitCode: record.exitCode,
     note: record.note,
+    account: record.account ?? null,
     tail,
     stderrTail,
   });
@@ -466,14 +476,26 @@ const make = Effect.gen(function* () {
       // environment passes through untouched: no metered-billing fallback.
       // Route to the subscription with the most five-hour room; when all are
       // spent the caller hears when the first resets and can pick another model.
-      const pick = yield* museUsage.pickAccount;
+      // An explicit account runs there or not at all; the pool takes the
+      // subscription with the most five-hour room. A spent account is never
+      // swapped for another mid-request, and the caller hears when it resets.
+      const pick = yield* museUsage.pickAccount(input.account);
+      if (pick?._tag === "Unknown" || (pick === null && input.account !== undefined)) {
+        return yield* new MuseWorkerInputError({ reason: "unknown_account" });
+      }
       if (pick?._tag === "AllLimited") {
         return yield* new MuseLimitReachedError({
           resetsAt: DateTime.formatIso(DateTime.makeUnsafe(pick.resetsAtMs)),
         });
       }
-      const authPath = pick?._tag === "Account" ? pick.account.authPath : undefined;
-      const wrapper = (process.env.NOFUN_MUSE_WORKER ?? "").trim() || DEFAULT_WRAPPER;
+      const account = pick?._tag === "Account" ? pick.account : null;
+      const childEnv = account ? museChildEnvironment(account, process.env) : null;
+      if (childEnv && "refused" in childEnv) {
+        return yield* new MuseWorkerInputError({ reason: "api_billing_refused" });
+      }
+      const wrapper =
+        account?.workerExecutable ??
+        ((process.env.NOFUN_MUSE_WORKER ?? "").trim() || DEFAULT_WRAPPER);
       const model = (process.env.NOFUN_MUSE_MODEL ?? "").trim() || DEFAULT_MODEL;
       const jobId = yield* newJobId.pipe(Effect.mapError(ioError("new-job-id", jobsRoot)));
       const dir = jobDir(jobId);
@@ -513,7 +535,8 @@ const make = Effect.gen(function* () {
           stdout: "pipe",
           stderr: "pipe",
           detached: process.platform !== "win32",
-          ...(authPath ? { env: { MUSE_AUTH_PATH: authPath }, extendEnv: true } : {}),
+          // The account's own environment replaces the server's, never extends it.
+          ...(childEnv ? { env: childEnv.env, extendEnv: false } : {}),
         },
       );
       // The spawn lives in the service scope so the job outlives this call.
@@ -551,6 +574,7 @@ const make = Effect.gen(function* () {
         resultPath: stdoutPath,
         exitCode: null,
         note: null,
+        ...(account ? { account: account.id } : {}),
       };
       yield* writeRecord(record);
       yield* fileSystem
@@ -663,6 +687,7 @@ const make = Effect.gen(function* () {
           startedAt: record.startedAt,
           finishedAt: record.finishedAt,
           note: record.note,
+          account: record.account ?? null,
         }));
     });
 
