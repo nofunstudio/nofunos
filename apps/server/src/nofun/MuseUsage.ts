@@ -41,10 +41,8 @@ import {
   MuseSubscriptionUsage,
   museSourceSnapshot,
   museChildEnvironment,
-  pickMuseAccount,
   type MuseAccount,
   type MuseAccountState,
-  type MusePick,
 } from "./museUsage.logic.ts";
 import { readNofunPersonaScope } from "./persona.ts";
 
@@ -58,12 +56,6 @@ export class MuseUsage extends Context.Service<
     /** One snapshot per configured subscription; empty on other personas. */
     readonly current: Effect.Effect<ReadonlyArray<UsageLimitSourceSnapshot>>;
     readonly streamChanges: Stream.Stream<ReadonlyArray<UsageLimitSourceSnapshot>>;
-    /**
-     * Refreshes stale readings, then names the subscription the next Muse job
-     * should use: `accountId` when given, else the pool's best. `null` when
-     * no account is configured.
-     */
-    readonly pickAccount: (accountId?: string) => Effect.Effect<MusePick | null>;
   }
 >()("t3/nofun/MuseUsage") {}
 
@@ -298,8 +290,6 @@ const make = Effect.gen(function* () {
 
   return {
     current: snapshots,
-    pickAccount: (accountId) =>
-      refreshStale.pipe(Effect.map((states) => pickMuseAccount(states, accountId))),
     get streamChanges() {
       return Stream.unwrap(
         Effect.gen(function* () {

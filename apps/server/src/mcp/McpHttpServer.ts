@@ -37,9 +37,6 @@ import * as PreviewAutomationBroker from "./PreviewAutomationBroker.ts";
 import * as OrchestratorHandlers from "./toolkits/orchestrator/handlers.ts";
 import { OrchestratorToolkit } from "./toolkits/orchestrator/tools.ts";
 import { readNofunPersonaScope } from "../nofun/persona.ts";
-import * as MuseHandlers from "./toolkits/muse/handlers.ts";
-import { MuseToolkit } from "./toolkits/muse/tools.ts";
-import * as MuseWorkerBridge from "../nofun/MuseWorkerBridge.ts";
 import * as PreviewHandlers from "./toolkits/preview/handlers.ts";
 import {
   PreviewSnapshotTool,
@@ -718,11 +715,6 @@ export const layerOrchestratorToolkit = McpServer.toolkit(OrchestratorToolkit).p
   Layer.provide(ThreadMetadataMcpService.layer),
 );
 
-export const layerMuseToolkit = McpServer.toolkit(MuseToolkit).pipe(
-  Layer.provide(MuseHandlers.layer),
-  Layer.provide(MuseWorkerBridge.layer),
-);
-
 export const layerThreadToolkit = McpServer.toolkit(ThreadToolkit).pipe(
   Layer.provide(ThreadHandlers.layer),
 );
@@ -772,13 +764,12 @@ const layerMcpTransport = McpServer.layerHttp({
   protocols: [McpProtocol.v2025_06_18],
 }).pipe(Layer.provide(layerMcpAuthMiddleware));
 
-// CATCHES agents never reach Muse, and publish Claude artifacts instead of No Fun ones.
+// CATCHES agents publish Claude artifacts instead of No Fun ones.
 const isCatchesPersona = readNofunPersonaScope()?.info.id === "catches";
 
 export const layer = Layer.mergeAll(
   layerPreviewToolkit,
   layerOrchestratorToolkit,
-  isCatchesPersona ? Layer.empty : layerMuseToolkit,
   layerThreadToolkit,
   layerAttachmentRegistration,
   layerProjectRegistration,

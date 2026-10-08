@@ -9,7 +9,6 @@ import { create } from "zustand";
 
 export type FleetFocus =
   | { readonly kind: "thread"; readonly threadId: string }
-  | { readonly kind: "muse"; readonly jobId: string }
   | { readonly kind: "background"; readonly taskId: string };
 
 interface FleetFocusState {
