@@ -36,7 +36,7 @@ import {
 import { Button } from "../ui/button";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "../ui/tooltip";
 import { UsageLimitsPooled } from "./UsageLimitsPooled";
-import { PROVIDER_PRESENTATION } from "./usageProviders";
+import { MUSE_USAGE_PRESENTATION, PROVIDER_PRESENTATION } from "./usageProviders";
 
 const PACE: Record<LimitPace, { readonly label: string; readonly icon: typeof GaugeIcon }> = {
   ahead: { label: "Ahead of pace: spending faster than the window elapses", icon: TrendingUpIcon },
@@ -48,6 +48,7 @@ const PACE: Record<LimitPace, { readonly label: string; readonly icon: typeof Ga
 export function barColor(driver: ServerProvider["driver"]): string {
   const kind: UsageProviderKind | undefined =
     driver === "codex" ? "codex" : driver === "claudeAgent" ? "claude" : undefined;
+  if (driver === "muse") return MUSE_USAGE_PRESENTATION.color;
   return kind ? PROVIDER_PRESENTATION[kind].color : "var(--foreground)";
 }
 

@@ -30,6 +30,13 @@ const museWorkerSpawn = (error: MuseWorkerBridge.MuseWorkerSpawnError) =>
       message: `Could not start the external Muse worker for ${error.workspace} (${error.profile}).`,
     }),
   );
+const museLimitReached = (error: MuseWorkerBridge.MuseLimitReachedError) =>
+  Effect.fail(
+    new OrchestratorMcpFailure({
+      code: "provider_unavailable" as const,
+      message: `${error.message} Use a different model for this work until then.`,
+    }),
+  );
 const museWorkerIo = (error: MuseWorkerBridge.MuseWorkerIoError) =>
   Effect.fail(
     new OrchestratorMcpFailure({
@@ -57,6 +64,7 @@ const handlers = {
             MuseWorkerInputError: museWorkerInput,
             MuseWorkerSpawnError: museWorkerSpawn,
             MuseWorkerIoError: museWorkerIo,
+            MuseLimitReachedError: museLimitReached,
           }),
         );
     }),

@@ -4,7 +4,8 @@
  *
  * Each configured `settings.usageLimitSources` entry is polled on the
  * provider health-check interval and on every settings change, then
- * published as one snapshot per source over `subscribeServerConfig`. A source
+ * published as one snapshot per source over `subscribeServerConfig`, after
+ * the No Fun Muse subscriptions `MuseUsage` reads on its own schedule. A source
  * that fails keeps its row with `error` set so the user can see it is
  * configured but unreachable. Nothing is persisted: like provider status,
  * this is live state that re-derives on boot.
@@ -34,6 +35,7 @@ import * as Semaphore from "effect/Semaphore";
 import * as Stream from "effect/Stream";
 
 import * as BackgroundPolicy from "../background/BackgroundPolicy.ts";
+import * as MuseUsage from "../nofun/MuseUsage.ts";
 import * as Settings from "../serverSettings.ts";
 import { makeCliproxyApi } from "./cliproxyApi.ts";
 
@@ -65,6 +67,7 @@ export const make = Effect.gen(function* () {
   const api = yield* makeCliproxyApi;
   const settingsService = yield* Settings.ServerSettingsService;
   const backgroundPolicy = yield* BackgroundPolicy.BackgroundPolicy;
+  const muse = yield* MuseUsage.MuseUsage;
   const stateRef = yield* Ref.make<ReadonlyArray<UsageLimitSourceSnapshot>>([]);
   const changes = yield* Effect.acquireRelease(
     PubSub.unbounded<ReadonlyArray<UsageLimitSourceSnapshot>>(),
@@ -165,7 +168,10 @@ export const make = Effect.gen(function* () {
   yield* refresh.pipe(Effect.forkScoped);
 
   return {
-    current: Ref.get(stateRef),
+    current: Effect.zipWith(Ref.get(stateRef), muse.current, (hubs, museSources) => [
+      ...hubs,
+      ...museSources,
+    ]),
     consumeResetCredit,
     refresh,
     get streamChanges() {
@@ -173,7 +179,9 @@ export const make = Effect.gen(function* () {
         Effect.gen(function* () {
           const subscription = yield* PubSub.subscribe(changes);
           const snapshot = yield* Ref.get(stateRef);
-          return Stream.concat(Stream.make(snapshot), Stream.fromSubscription(subscription)).pipe(
+          const hubs = Stream.concat(Stream.make(snapshot), Stream.fromSubscription(subscription));
+          return Stream.zipLatest(hubs, muse.streamChanges).pipe(
+            Stream.map(([hubSources, museSources]) => [...hubSources, ...museSources]),
             Stream.changes,
           );
         }),

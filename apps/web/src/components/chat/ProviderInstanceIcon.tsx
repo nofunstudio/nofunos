@@ -9,6 +9,7 @@ import {
   CursorIcon,
   GrokIcon,
   Icon,
+  MetaIcon,
   OpenAI,
   OpenCodeIcon,
   PiAgentIcon,
@@ -29,6 +30,8 @@ const PROVIDER_ICON_BY_PROVIDER: Partial<Record<ProviderDriverKind, Icon>> = {
   [ProviderDriverKind.make("grok")]: GrokIcon,
   [ProviderDriverKind.make("antigravity")]: AntigravityIcon,
   [ProviderDriverKind.make("pi")]: PiAgentIcon,
+  // Not a T3 provider: Muse quota reaches the usage views from No Fun.
+  [ProviderDriverKind.make("muse")]: MetaIcon,
 };
 
 const PROVIDER_TEXT_COLOR_BY_PROVIDER: Partial<Record<ProviderDriverKind, string>> = {
@@ -39,6 +42,7 @@ const PROVIDER_TEXT_COLOR_BY_PROVIDER: Partial<Record<ProviderDriverKind, string
   [ProviderDriverKind.make("pi")]: "text-[#0F0F0F] dark:text-[#F5F5F5]",
   [ProviderDriverKind.make("opencode")]: "text-[#211E1E] dark:text-[#F1ECEC]",
   [ProviderDriverKind.make("antigravity")]: "text-[#5b87bf]",
+  [ProviderDriverKind.make("muse")]: "text-[#0866FF]",
 };
 
 export function providerTextColorClassName(driverKind: ProviderDriverKind): string | undefined {

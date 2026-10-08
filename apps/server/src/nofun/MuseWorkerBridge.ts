@@ -33,6 +33,7 @@ import * as Stream from "effect/Stream";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import * as ServerConfig from "../config.ts";
+import * as MuseUsage from "./MuseUsage.ts";
 
 /** Profiles the controller may hand to the external worker. */
 export type MuseWorkerProfile = "muse-review" | "muse-focused" | "muse-build";
@@ -73,6 +74,16 @@ export class MuseWorkerInputError extends Schema.TaggedError<MuseWorkerInputErro
 ) {
   override get message(): string {
     return `Invalid Muse worker start input: ${this.reason}.`;
+  }
+}
+
+/** Every Muse subscription is out of five-hour or weekly quota. */
+export class MuseLimitReachedError extends Schema.TaggedError<MuseLimitReachedError>()(
+  "MuseLimitReachedError",
+  { resetsAt: Schema.String },
+) {
+  override get message(): string {
+    return `Every Muse subscription is at its usage limit until ${this.resetsAt}.`;
   }
 }
 
@@ -172,7 +183,7 @@ export class MuseWorkerBridge extends Context.Service<
       readonly threadId: string;
     }) => Effect.Effect<
       MuseStartResult,
-      MuseWorkerInputError | MuseWorkerSpawnError | MuseWorkerIoError
+      MuseWorkerInputError | MuseWorkerSpawnError | MuseWorkerIoError | MuseLimitReachedError
     >;
     readonly jobStatus: (
       jobId: string,
@@ -194,6 +205,7 @@ const make = Effect.gen(function* () {
   const fileSystem = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* ServerConfig.ServerConfig;
+  const museUsage = yield* MuseUsage.MuseUsage;
 
   // Children live in this scope, not the request scope, so a job survives
   // the start call. Closing it (layer shutdown) reaps every live child.
@@ -452,6 +464,15 @@ const make = Effect.gen(function* () {
 
       // The wrapper refuses to run when META_API_KEY is set, so the parent
       // environment passes through untouched: no metered-billing fallback.
+      // Route to the subscription with the most five-hour room; when all are
+      // spent the caller hears when the first resets and can pick another model.
+      const pick = yield* museUsage.pickAccount;
+      if (pick?._tag === "AllLimited") {
+        return yield* new MuseLimitReachedError({
+          resetsAt: DateTime.formatIso(DateTime.makeUnsafe(pick.resetsAtMs)),
+        });
+      }
+      const authPath = pick?._tag === "Account" ? pick.account.authPath : undefined;
       const wrapper = (process.env.NOFUN_MUSE_WORKER ?? "").trim() || DEFAULT_WRAPPER;
       const model = (process.env.NOFUN_MUSE_MODEL ?? "").trim() || DEFAULT_MODEL;
       const jobId = yield* newJobId.pipe(Effect.mapError(ioError("new-job-id", jobsRoot)));
@@ -492,6 +513,7 @@ const make = Effect.gen(function* () {
           stdout: "pipe",
           stderr: "pipe",
           detached: process.platform !== "win32",
+          ...(authPath ? { env: { MUSE_AUTH_PATH: authPath }, extendEnv: true } : {}),
         },
       );
       // The spawn lives in the service scope so the job outlives this call.

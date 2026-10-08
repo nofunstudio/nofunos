@@ -217,7 +217,10 @@ export const CursorDriver: ProviderDriver<CursorSettings, CursorDriverEnv> = {
                     Effect.flatMap((settings) =>
                       readCursorUsageLimits(
                         effectiveConfig,
-                        { ...processEnv, CURSOR_API_KEY: apiKey },
+                        // Only a configured key may name another account. The
+                        // key a browser sign-in stores is the same login, so it
+                        // must not hide the account's limits.
+                        auth.usesApiKey ? { ...processEnv, CURSOR_API_KEY: apiKey } : processEnv,
                         settings.cursorKeychainUsageEnabled,
                       ),
                     ),

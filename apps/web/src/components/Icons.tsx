@@ -830,3 +830,18 @@ export const ComputerUseAppIcon: Icon = (props) => {
     </svg>
   );
 };
+
+/** Meta's infinity mark, for Muse (Meta's coding agent). */
+export const MetaIcon: Icon = ({ className, ...props }) => (
+  <svg
+    {...props}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth={2.6}
+    strokeLinecap="round"
+    className={className}
+  >
+    <path d="M12 12c-2.2-3.4-3.8-5-5.6-5C4.3 7 3 9.3 3 12.2 3 14.9 4.3 17 6.3 17c1.9 0 3.3-1.6 5.7-5 2.4-3.4 3.8-5 5.6-5 2.1 0 3.4 2.3 3.4 5.2 0 2.7-1.3 4.8-3.3 4.8-1.9 0-3.3-1.6-5.7-5Z" />
+  </svg>
+);

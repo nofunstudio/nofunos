@@ -103,7 +103,8 @@ export type UsageLimitSourceAccount = typeof UsageLimitSourceAccount.Type;
  */
 export const UsageLimitSourceSnapshot = Schema.Struct({
   id: UsageLimitSourceId,
-  kind: Schema.Literal("cliproxy"),
+  /** `cliproxy` is a configured hub; `muse` is a No Fun Muse subscription. */
+  kind: Schema.Literals(["cliproxy", "muse"]),
   label: TrimmedNonEmptyString,
   checkedAt: IsoDateTime,
   accounts: ForwardCompatibleArray(UsageLimitSourceAccount),

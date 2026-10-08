@@ -61,3 +61,18 @@ export function providersWithUsage(
   );
   return PROVIDER_ORDER.filter((provider) => active.has(provider));
 }
+
+/**
+ * Muse is not a T3 provider: its quota arrives from the No Fun usage source,
+ * so it only needs a name and a bar colour here.
+ */
+export const MUSE_USAGE_PRESENTATION = { label: "Muse", color: "#0866FF" } as const;
+
+/** A limits account's provider as a person would name it. */
+export function usageDriverLabel(driver: string): string {
+  if (driver === "muse") return MUSE_USAGE_PRESENTATION.label;
+  return (
+    Object.values(PROVIDER_PRESENTATION).find((entry) => entry.driverKind === driver)?.label ??
+    driver
+  );
+}

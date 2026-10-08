@@ -34,6 +34,7 @@ import {
   resetCreditsSummary,
   useResetCredit,
 } from "./UsageLimits";
+import { usageDriverLabel } from "./usageProviders";
 
 /** `someone@example.com` → `SE`: enough to tell accounts apart, too little to identify one. */
 function accountInitials(email: string): string {
@@ -81,7 +82,9 @@ function AccountAvatar({
       <ProviderInstanceIcon
         driverKind={account.driver}
         displayName={
-          account.displayName ?? getDriverOption(account.driver)?.label ?? String(account.driver)
+          account.displayName ??
+          getDriverOption(account.driver)?.label ??
+          usageDriverLabel(account.driver)
         }
         accentColor={account.accentColor}
         showBadge={Boolean(account.displayName)}
@@ -116,7 +119,7 @@ function AccountName({
   }
   return (
     <span className={className}>
-      {getDriverOption(account.driver)?.label ?? String(account.driver)}
+      {getDriverOption(account.driver)?.label ?? usageDriverLabel(account.driver)}
     </span>
   );
 }
@@ -166,7 +169,9 @@ function SegmentPopover({
         <span className="flex items-center gap-2 text-sm font-medium text-foreground">
           <AccountAvatar account={account} />
           <span className="truncate">
-            {account.displayName ?? getDriverOption(account.driver)?.label ?? account.driver}
+            {account.displayName ??
+              getDriverOption(account.driver)?.label ??
+              usageDriverLabel(account.driver)}
           </span>
         </span>
         {account.email ? (
@@ -530,7 +535,7 @@ function PoolWindowCard({
 
 function PoolSection({ pool, now }: { readonly pool: LimitPool; readonly now: number }) {
   const color = barColor(pool.driver);
-  const label = getDriverOption(pool.driver)?.label ?? String(pool.driver);
+  const label = getDriverOption(pool.driver)?.label ?? usageDriverLabel(pool.driver);
   const windows = displayLimitWindows(pool);
   return (
     <section className="flex flex-col gap-3">
