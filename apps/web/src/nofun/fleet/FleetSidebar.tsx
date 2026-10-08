@@ -2,8 +2,7 @@
  * The Fleet sidebar: every agent working for this thread, live.
  *
  * Reads only the v2 projection (`subagents`, child thread shells, a child's
- * latest provider turn) plus Muse job summaries. No store of its own, no
- * polling; the only timer is the 1 Hz elapsed tick of a running row. A child's
+ * latest provider turn). No store of its own, no polling; the only timer is the 1 Hz elapsed tick of a running row. A child's
  * projection is subscribed only while its row is active or its Done group is
  * open. Stopping is an explicit per-row action.
  */
@@ -25,12 +24,7 @@ import { useMemo, useState } from "react";
 import { AgentElapsed } from "../../components/chat/AgentElapsed";
 import { Button } from "../../components/ui/button";
 import { cn } from "../../lib/utils";
-import {
-  useServerConfigs,
-  useThreadProjection,
-  useThreadShell,
-  useThreadShells,
-} from "../../state/entities";
+import { useServerConfigs, useThreadProjection, useThreadShells } from "../../state/entities";
 import { threadEnvironment } from "../../state/threads";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { buildThreadRouteParams } from "../../threadRoutes";
@@ -38,7 +32,6 @@ import { FleetAvatar } from "./FleetAvatar";
 import {
   AgentConversation,
   AgentViewHeader,
-  MuseJobLogView,
   describeAgent,
   type AgentHeader,
 } from "./FleetAgentView";
@@ -47,15 +40,12 @@ import {
   PHASE_LABEL,
   defaultEffortFor,
   driverName,
-  museRow,
   resolveEffort,
   shortModelName,
-  splitFleetRows,
   subagentRow,
   subagentRowPhase,
   type FleetRow,
 } from "./fleetModel";
-import { useMuseJobs } from "./museJobs";
 import { backgroundRow } from "./fleetModel";
 import { backgroundKindLabel } from "./backgroundModel";
 import { formatAgo } from "./FleetAgentView";
@@ -217,8 +207,6 @@ function SubagentBranch(props: {
   );
 }
 
-type MuseJobs = ReturnType<typeof useMuseJobs>;
-
 function SectionLabel(props: { readonly children: string }) {
   return (
     <div className="px-2 pt-2 pb-0.5 text-2xs font-medium text-muted-foreground/70">
@@ -231,9 +219,8 @@ function FleetList(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly shells: Shells;
-  readonly muse: MuseJobs;
 }) {
-  const { environmentId, threadId, shells, muse } = props;
+  const { environmentId, threadId, shells } = props;
   const ref = scopeThreadRef(environmentId, threadId);
   const projection = useThreadProjection(ref)?.projection ?? null;
   const [doneOpen, setDoneOpen] = useState(false);
@@ -249,11 +236,10 @@ function FleetList(props: {
         DateTime.toEpochMillis(b.completedAt ?? b.updatedAt) -
         DateTime.toEpochMillis(a.completedAt ?? a.updatedAt),
     );
-  const museRows = useMemo(() => splitFleetRows(muse.jobs.map(museRow)), [muse.jobs]);
   const background = useBackgroundRows(ref);
   const backgroundRows = useMemo(() => background.map(backgroundRow), [background]);
-  const activeCount = activeAgents.length + museRows.active.length + backgroundRows.length;
-  const doneCount = doneAgents.length + museRows.settled.length;
+  const activeCount = activeAgents.length + backgroundRows.length;
+  const doneCount = doneAgents.length;
 
   const setFocus = useFleetFocusStore((state) => state.setFocus);
   const openThread = (id: ThreadId) => setFocus(ref, { kind: "thread", threadId: id });
@@ -285,14 +271,6 @@ function FleetList(props: {
           <SectionLabel>Agents</SectionLabel>
         ) : null}
         {activeAgents.map((agent) => branch(agent, true))}
-        {museRows.active.map((row) => (
-          <FleetRowView
-            key={row.key}
-            row={row}
-            onOpen={() => setFocus(ref, { kind: "muse", jobId: row.museJobId ?? row.key })}
-            onStop={row.museJobId ? () => void muse.cancel(row.museJobId!) : null}
-          />
-        ))}
         {doneCount > 0 ? (
           <div className="mt-1.5">
             <button
@@ -306,19 +284,7 @@ function FleetList(props: {
               />
               Done ({doneCount})
             </button>
-            {doneOpen ? (
-              <>
-                {doneAgents.map((agent) => branch(agent, true))}
-                {museRows.settled.map((row) => (
-                  <FleetRowView
-                    key={row.key}
-                    row={row}
-                    onOpen={() => setFocus(ref, { kind: "muse", jobId: row.museJobId ?? row.key })}
-                    onStop={null}
-                  />
-                ))}
-              </>
-            ) : null}
+            {doneOpen ? doneAgents.map((agent) => branch(agent, true)) : null}
           </div>
         ) : null}
         {backgroundRows.length > 0 ? (
@@ -401,8 +367,6 @@ function FleetDetail(props: {
   readonly environmentId: EnvironmentId;
   readonly threadId: ThreadId;
   readonly shells: Shells;
-  readonly muse: MuseJobs;
-  readonly parentRefreshKey: string;
 }) {
   const { environmentId, threadId } = props;
   const navigate = useNavigate();
@@ -413,26 +377,6 @@ function FleetDetail(props: {
   const providers = useServerConfigs().get(environmentId)?.providers ?? NO_PROVIDERS;
   const back = () => setFocus(ref, null);
   if (focus === null) return null;
-
-  if (focus.kind === "muse") {
-    const job = props.muse.jobs.find((candidate) => candidate.jobId === focus.jobId);
-    const row = job ? museRow(job) : null;
-    const header: AgentHeader = {
-      title: row?.title ?? "Muse job",
-      driver: "muse",
-      phase: row?.phase ?? "done",
-      detail: describeAgent(["Muse", shortModelName(row?.model ?? null)]),
-    };
-    return (
-      <MuseJobLogView
-        environmentId={environmentId}
-        jobId={focus.jobId}
-        refreshKey={props.parentRefreshKey}
-        header={header}
-        onBack={back}
-      />
-    );
-  }
 
   if (focus.kind === "background") {
     return <BackgroundDetail threadRef={ref} taskId={focus.taskId} onBack={back} />;
@@ -468,7 +412,6 @@ export function FleetSidebar(props: {
 }) {
   const { environmentId, threadId } = props;
   const ref = scopeThreadRef(environmentId, threadId);
-  const parentShell = useThreadShell(ref);
   const focus = useFleetFocus(ref);
   const allShells = useThreadShells();
   const shells = useMemo<Shells>(
@@ -480,25 +423,12 @@ export function FleetSidebar(props: {
       ),
     [allShells, environmentId],
   );
-  const parentRefreshKey = `${parentShell?.source.itemCount ?? 0}:${parentShell?.source.status ?? ""}`;
-  const muse = useMuseJobs({
-    environmentId,
-    threadId,
-    refreshKey: parentRefreshKey,
-    enabled: true,
-  });
   return (
     <div className="flex h-full min-h-0 flex-col" data-nofun-fleet-sidebar>
       {focus === null ? (
-        <FleetList environmentId={environmentId} threadId={threadId} shells={shells} muse={muse} />
+        <FleetList environmentId={environmentId} threadId={threadId} shells={shells} />
       ) : (
-        <FleetDetail
-          environmentId={environmentId}
-          threadId={threadId}
-          shells={shells}
-          muse={muse}
-          parentRefreshKey={parentRefreshKey}
-        />
+        <FleetDetail environmentId={environmentId} threadId={threadId} shells={shells} />
       )}
     </div>
   );

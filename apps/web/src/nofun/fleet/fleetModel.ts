@@ -1,6 +1,6 @@
 /**
  * Row view-model for the Fleet sidebar: pure derivation from the v2 projection
- * (`subagents`), the child thread shells, and Muse job summaries. The sidebar
+ * (`subagents`) and the child thread shells. The sidebar
  * renders these rows and owns no state of its own.
  */
 import type { ModelSelection, OrchestrationV2Subagent, ServerProvider } from "@t3tools/contracts";
@@ -12,7 +12,7 @@ import {
 import { getProviderModelCapabilities } from "../../providerModels";
 import { backgroundKindLabel, type BackgroundRow } from "./backgroundModel";
 
-export type FleetSource = "t3" | "native" | "muse" | "background";
+export type FleetSource = "t3" | "native" | "background";
 export type FleetPhase =
   | "queued"
   | "running"
@@ -26,7 +26,7 @@ export type FleetPhase =
 export interface FleetRow {
   readonly key: string;
   readonly source: FleetSource;
-  /** Provider driver kind ("claudeAgent", "codex", ...) or "muse". */
+  /** Provider driver kind ("claudeAgent", "codex", ...). */
   readonly driver: string;
   readonly title: string;
   /** Where the agent came from, in a few words: "from T3", "Claude native", "external". */
@@ -41,7 +41,6 @@ export interface FleetRow {
   readonly completedAt: string | null;
   /** The thread to open on click, when the agent has one. */
   readonly childThreadId: string | null;
-  readonly museJobId: string | null;
   readonly depth: number;
 }
 
@@ -175,55 +174,7 @@ export function subagentRow(input: SubagentRowInput): FleetRow {
     startedAt: input.startedAt,
     completedAt: input.completedAt,
     childThreadId: agent.childThreadId ?? null,
-    museJobId: null,
     depth: input.depth,
-  };
-}
-
-export interface MuseJobSummary {
-  readonly jobId: string;
-  readonly status: "running" | "succeeded" | "failed" | "cancelled";
-  readonly profile: string;
-  readonly model: string;
-  readonly startedAt: string;
-  readonly finishedAt: string | null;
-  readonly note: string | null;
-  /** The Muse subscription id the job runs on; absent on older servers and jobs. */
-  readonly account?: string | null;
-}
-
-const MUSE_PHASE: Record<MuseJobSummary["status"], FleetPhase> = {
-  running: "running",
-  succeeded: "done",
-  failed: "failed",
-  cancelled: "stopped",
-};
-
-const MUSE_PROFILE_TITLE: Record<string, string> = {
-  "muse-review": "Muse review",
-  "muse-focused": "Muse focused task",
-  "muse-build": "Muse build",
-};
-
-export function museRow(job: MuseJobSummary): FleetRow {
-  const phase = MUSE_PHASE[job.status];
-  return {
-    key: job.jobId,
-    source: "muse",
-    driver: "muse",
-    title: MUSE_PROFILE_TITLE[job.profile] ?? "Muse job",
-    origin: job.account ? `External worker · ${job.account}` : "External worker",
-    model: job.model,
-    // Muse's wrapper fixes its reasoning level; the job record has none.
-    effort: null,
-    tokens: null,
-    phase,
-    active: isActivePhase(phase),
-    startedAt: job.startedAt,
-    completedAt: job.finishedAt,
-    childThreadId: null,
-    museJobId: job.jobId,
-    depth: 0,
   };
 }
 
@@ -243,21 +194,8 @@ export function backgroundRow(row: BackgroundRow): FleetRow {
     startedAt: row.startedAt,
     completedAt: null,
     childThreadId: null,
-    museJobId: null,
     depth: 0,
   };
-}
-
-/** Active first (running before queued), then done newest-first. */
-export function splitFleetRows(rows: ReadonlyArray<FleetRow>): {
-  readonly active: ReadonlyArray<FleetRow>;
-  readonly settled: ReadonlyArray<FleetRow>;
-} {
-  const active: FleetRow[] = [];
-  const settled: FleetRow[] = [];
-  for (const row of rows) (row.active ? active : settled).push(row);
-  settled.sort((a, b) => Date.parse(b.completedAt ?? "") - Date.parse(a.completedAt ?? "") || 0);
-  return { active, settled };
 }
 
 /** "gpt-6-luna" stays as is; a dated provider id loses its date suffix. */

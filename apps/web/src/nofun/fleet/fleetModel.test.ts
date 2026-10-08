@@ -2,12 +2,9 @@ import { describe, expect, it } from "vite-plus/test";
 
 import {
   defaultEffortFor,
-  museRow,
   resolveEffort,
   shortModelName,
-  splitFleetRows,
   subagentRow,
-  type MuseJobSummary,
   phaseRelationshipStatus,
 } from "./fleetModel";
 
@@ -79,44 +76,6 @@ describe("resolveEffort", () => {
   it("is null without a selection or option", () => {
     expect(resolveEffort(undefined)).toBeNull();
     expect(resolveEffort({ instanceId: "x", model: "m" } as never)).toBeNull();
-  });
-});
-
-describe("museRow", () => {
-  const job = (status: MuseJobSummary["status"]): MuseJobSummary => ({
-    jobId: "muse-1",
-    status,
-    profile: "muse-review",
-    model: "muse-spark-1.3-contributor",
-    startedAt: "2026-10-06T10:00:00.000Z",
-    finishedAt: null,
-    note: null,
-  });
-
-  it("is an external worker with no reported tokens", () => {
-    expect(museRow(job("running"))).toMatchObject({
-      source: "muse",
-      origin: "External worker",
-      title: "Muse review",
-      tokens: null,
-      active: true,
-      museJobId: "muse-1",
-    });
-    expect(museRow(job("succeeded")).active).toBe(false);
-    expect(museRow(job("cancelled")).phase).toBe("stopped");
-  });
-});
-
-describe("splitFleetRows", () => {
-  it("keeps active rows in order and sorts settled newest first", () => {
-    const rows = [
-      { ...base(), key: "a", active: true },
-      { ...base({ status: "completed" }), key: "b", completedAt: "2026-10-06T10:01:00.000Z" },
-      { ...base({ status: "completed" }), key: "c", completedAt: "2026-10-06T10:05:00.000Z" },
-    ];
-    const { active, settled } = splitFleetRows(rows);
-    expect(active.map((row) => row.key)).toEqual(["a"]);
-    expect(settled.map((row) => row.key)).toEqual(["c", "b"]);
   });
 });
 

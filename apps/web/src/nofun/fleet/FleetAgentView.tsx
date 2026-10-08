@@ -1,8 +1,7 @@
 /**
  * One agent opened inside the Agents sidebar: a read-only conversation. A child
  * thread renders through the chat view's own MessagesTimeline, subscribed only
- * while this view is mounted; a Muse job renders its log tail. Back returns to
- * the list; the arrow-out icon opens the full thread in the chat.
+ * while this view is mounted. Back returns to the list; the arrow-out icon opens the full thread in the chat.
  */
 import type { EnvironmentId, ServerProvider, ThreadId, TurnItemId } from "@t3tools/contracts";
 import { turnItemOutputText } from "@t3tools/client-runtime/work-log/item-detail";
@@ -34,7 +33,6 @@ import {
 import { useTurnItemDetail } from "../../state/queries";
 import { FleetAvatar } from "./FleetAvatar";
 import { PHASE_LABEL, type FleetPhase } from "./fleetModel";
-import { useMuseJobLog } from "./museJobs";
 import type { BackgroundRow } from "./backgroundModel";
 
 const EMPTY_PROVIDERS: ReadonlyArray<ServerProvider> = [];
@@ -185,53 +183,6 @@ export function AgentConversation(props: {
         onManualNavigation={noop}
       />
     </div>
-  );
-}
-
-/** A Muse job's log tail. */
-export function MuseJobLogView(props: {
-  readonly environmentId: EnvironmentId;
-  readonly jobId: string;
-  readonly refreshKey: string;
-  readonly header: AgentHeader;
-  readonly onBack: () => void;
-}) {
-  const { log, refresh } = useMuseJobLog({
-    environmentId: props.environmentId,
-    jobId: props.jobId,
-    refreshKey: props.refreshKey,
-  });
-  const lines = log === null ? [] : [...log.tail, ...log.stderrTail.map((line) => `! ${line}`)];
-  const scrollRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const node = scrollRef.current;
-    if (node) node.scrollTop = node.scrollHeight;
-  }, [log]);
-  return (
-    <>
-      <AgentViewHeader
-        header={props.header}
-        onBack={props.onBack}
-        onRefresh={() => void refresh()}
-      />
-      <div
-        ref={scrollRef}
-        className="min-h-0 flex-1 overflow-y-auto px-3.5 py-3"
-        data-fleet-muse-log
-      >
-        {log === null ? (
-          <p className="text-xs text-muted-foreground">Loading the job log.</p>
-        ) : lines.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {log.note ?? "This job has not written any output yet."}
-          </p>
-        ) : (
-          <pre className="m-0 whitespace-pre-wrap break-words font-mono text-2xs leading-relaxed text-foreground/80">
-            {lines.join("\n")}
-          </pre>
-        )}
-      </div>
-    </>
   );
 }
 

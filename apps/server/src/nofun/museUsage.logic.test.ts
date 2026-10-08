@@ -4,7 +4,6 @@ import {
   museChildEnvironment,
   museSourceSnapshot,
   museUsageWindows,
-  pickMuseAccount,
   type MuseAccount,
   type MuseAccountState,
   type MuseSubscriptionUsage,
@@ -33,61 +32,6 @@ const state = (
   error: null,
   checkedAtMs: 500,
   ...extra,
-});
-
-const picked = (pick: ReturnType<typeof pickMuseAccount>) =>
-  pick?._tag === "Account" ? pick.account.id : pick;
-
-describe("pickMuseAccount", () => {
-  it("routes pool work to the subscription with the most five-hour room", () => {
-    expect(picked(pickMuseAccount([state("a", usage(80, 10)), state("b", usage(20, 90))]))).toBe(
-      "b",
-    );
-  });
-
-  it("schedules fresh work on the other account when one is limited", () => {
-    expect(picked(pickMuseAccount([state("a", usage(100, 40)), state("b", usage(60, 10))]))).toBe(
-      "b",
-    );
-  });
-
-  it("refuses an explicit account that is limited rather than moving the work", () => {
-    expect(pickMuseAccount([state("a", usage(100, 40)), state("b", usage(5, 5))], "a")).toEqual({
-      _tag: "AllLimited",
-      resetsAtMs: 1_000_000,
-    });
-  });
-
-  it("refuses an unknown explicit account", () => {
-    expect(pickMuseAccount([state("a", usage(5, 5))], "zzz")).toEqual({
-      _tag: "Unknown",
-      id: "zzz",
-    });
-  });
-
-  it("never runs an account signed in as someone else", () => {
-    const wrong = state("a", usage(0, 0), {
-      account: account("a", "me@example.com"),
-      signedInAs: "other@example.com",
-    });
-    expect(picked(pickMuseAccount([wrong, state("b", usage(50, 50))]))).toBe("b");
-    expect(pickMuseAccount([wrong])).toEqual({ _tag: "Unknown", id: "a verified Muse account" });
-  });
-
-  it("still runs on an account it could not read rather than blocking work", () => {
-    expect(picked(pickMuseAccount([state("a", usage(100, 40)), state("b", null)]))).toBe("b");
-  });
-
-  it("names the earliest reset when every subscription is spent", () => {
-    const spentWeekly: MuseSubscriptionUsage = {
-      ...usage(10, 100),
-      weekly: { usedPercent: 100, resetsAtMs: 400_000 },
-    };
-    expect(pickMuseAccount([state("a", usage(100, 40)), state("b", spentWeekly)])).toEqual({
-      _tag: "AllLimited",
-      resetsAtMs: 400_000,
-    });
-  });
 });
 
 describe("museChildEnvironment", () => {

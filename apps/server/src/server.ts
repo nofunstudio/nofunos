@@ -67,9 +67,7 @@ import * as PortScanner from "./preview/PortScanner.ts";
 import * as ServerBrowser from "./preview/ServerBrowser.ts";
 import * as DesktopBrowserChannel from "./preview/DesktopBrowserChannel.ts";
 import * as ServerBrowserStream from "./preview/ServerBrowserStream.ts";
-import * as MuseRoutes from "./nofun/museRoutes.ts";
 import * as MuseUsage from "./nofun/MuseUsage.ts";
-import * as MuseWorkerBridge from "./nofun/MuseWorkerBridge.ts";
 import * as WarpBridgeRoutes from "./terminal/warpBridge/routes.ts";
 import * as PreviewBrowser from "./preview/PreviewBrowser.ts";
 import * as ProcessRunner from "./processRunner.ts";
@@ -579,7 +577,7 @@ const layerRuntimeCoreDependenciesBase = Layer.mergeAll(
   Layer.provideMerge(
     Layer.mergeAll(Keybindings.layer, EnvironmentTheme.layer, UsageLimitSources.layer),
   ),
-  // Muse quota feeds the usage sources above and the Muse job router.
+  // Muse quota feeds the usage sources above and orchestrator_capabilities headroom.
   Layer.provideMerge(MuseUsage.layer),
   Layer.provideMerge(ProviderRegistry.layer),
   // The instance registry is the new routing keystone — text generation,
@@ -676,7 +674,6 @@ const layerMakeRoutes = Layer.mergeAll(
     DeviceHubProxy.layer,
     ServerBrowserStream.routeLayer,
     WarpBridgeRoutes.routeLayer,
-    MuseRoutes.routeLayer.pipe(Layer.provide(MuseWorkerBridge.layer)),
     ServerHttp.layerStaticAndDevRoute,
     Ws.layer,
   ),
