@@ -37,8 +37,18 @@ describe("usageHeadroom", () => {
     );
   });
 
-  it("treats a spent pool as exhausted", () => {
-    expect(usageHeadroom(limits(window("monthly", 100, 600)), NOW).headroom).toBe("exhausted");
+  it("treats a spent pool as exhausted and names repeated monthly pools", () => {
+    const result = usageHeadroom(
+      limits(
+        window("monthly", 100, 600, "Cursor Models"),
+        window("monthly", 100, 600, "Other Models"),
+      ),
+      NOW,
+    );
+    expect(result.headroom).toBe("exhausted");
+    expect(result.summary).toBe(
+      "Cursor Models 0% left (resets in 10h 0m) · Other Models 0% left (resets in 10h 0m)",
+    );
   });
 
   it("does not hold back a pool that resets within the hour", () => {

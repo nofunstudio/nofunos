@@ -48,7 +48,13 @@ export function usageHeadroom(
     if (left <= 0 && !resetsSoon) headroom = "exhausted";
     else if (left < LOW_PERCENT && !resetsSoon && headroom !== "exhausted") headroom = "low";
     const reset = resetMs === null ? "" : ` (resets in ${formatIn(resetMs)})`;
-    return `${WINDOW_NAME[window.kind]} ${left}% left${reset}`;
+    // Session and weekly read best as 5h/weekly; other kinds can repeat
+    // (Cursor has three monthly pools), so they keep their own label.
+    const name =
+      window.kind === "session" || window.kind === "weekly"
+        ? WINDOW_NAME[window.kind]
+        : window.label;
+    return `${name} ${left}% left${reset}`;
   });
   return { headroom, summary: parts.join(" · ") };
 }
