@@ -2,7 +2,6 @@ import { OrchestratorMcpFailure } from "@t3tools/contracts";
 import {
   ARTIFACT_ALLOWED_PACKAGES,
   artifactCatalogGuide,
-  artifactThemeGuide,
 } from "@t3tools/nofun-artifacts/compiler";
 import {
   HTML_RENDER_COLUMN_WIDTH,
@@ -65,7 +64,7 @@ export const NOFUN_ARTIFACT_GUIDE = [
   "Builds a No Fun artifact from the real No Fun component library (Kobra primitives and No Fun blocks) and a No Fun theme, as one self-contained page. Text stays primary: use it only when a dashboard, chart, table, comparison, timeline or gallery says more than prose, and only with real data you read from tools or the user. Never invent metrics, progress or verification badges.",
   `Two lanes, pass exactly one. spec: a JSON object {"root": node}, node = {"component", "props", "children"?}. Components (* = required prop):\n${artifactCatalogGuide()}\nExample spec: ${SPEC_EXAMPLE}`,
   `tsx: custom React compiled against the live No Fun library (~280 real blocks: heroes, charts, data, effects, AI, forms, navigation, landing sections...). It must \`export default\` a component. Imports: "react"; any block as "@nofun/ui/<registry-name>" (find names, exports and props with ${NOFUN_COMPONENTS_SEARCH_TOOL_NAME}; "@nofun/ui/<name>/demo" is a working example of each); Kobra primitives as "@nofun/kobra/<name>" (button, card, badge, table, tabs, dialog...); "@nofun/artifacts" (the ten components above plus Card, Badge, Button, Input, Table and Kpi parts, TrendChip, NumberValue, Sparkline, cn, formatNumberValue); and ${ARTIFACT_ALLOWED_PACKAGES.filter((p) => !p.startsWith("react")).join(", ")}. Style with Tailwind on the theme tokens (bg-card, text-muted-foreground, border-border, bg-canvas, text-ink, micro, display-m). No network calls. Example: ${TSX_EXAMPLE}`,
-  `theme: ${artifactThemeGuide()} Default kobra. The theme only styles the page; it never changes the account or thread. The page follows the reader's light/dark mode.`,
+  "theme: Any No Fun brand id or t3. Default kobra. t3 pins no brand and follows the reader's T3 theme. Themes are validated when the artifact is compiled. The theme only styles the page; it never changes the account or thread. The page follows the reader's light/dark mode.",
   "Unknown components, props or imports fail with a message naming each problem and its path; fix and call again.",
 ].join("\n\n");
 
